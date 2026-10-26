@@ -5423,6 +5423,46 @@ class AppLocalizations {
       args: [],
     );
   }
+
+  /// `Import config file`
+  String get harmonyImportConfig {
+    return Intl.message(
+      'Import config file',
+      name: 'harmonyImportConfig',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `If the subscription cannot be downloaded, import the config file from your VPS to connect.`
+  String get harmonyConfigImportHint {
+    return Intl.message(
+      'If the subscription cannot be downloaded, import the config file from your VPS to connect.',
+      name: 'harmonyConfigImportHint',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Config imported. Ready to connect.`
+  String get harmonyConfigImportSuccess {
+    return Intl.message(
+      'Config imported. Ready to connect.',
+      name: 'harmonyConfigImportSuccess',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Unable to import this config. Choose a valid config file no larger than 1 MB.`
+  String get harmonyConfigImportFailed {
+    return Intl.message(
+      'Unable to import this config. Choose a valid config file no larger than 1 MB.',
+      name: 'harmonyConfigImportFailed',
+      desc: '',
+      args: [],
+    );
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<AppLocalizations> {

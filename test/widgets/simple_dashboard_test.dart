@@ -201,6 +201,62 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
 
+  testWidgets('unreachable VPS offers local config import on a narrow screen', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(360, 780);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    var imports = 0;
+    await tester.pumpWidget(
+      scoped(
+        api: SignedOutApi(),
+        child: app(
+          SimpleConnectionPanel(
+            phase: ConnectionPhase.error,
+            username: 'vps.example.test',
+            directSubscription: true,
+            issue: HarmonyUserIssue.subscriptionUnreachable,
+            onImportConfig: () => imports++,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final importButton = find.byKey(const Key('harmony_import_config'));
+    await tester.ensureVisible(importButton);
+    expect(find.textContaining('可导入 VPS 提供的配置文件'), findsOneWidget);
+    await tester.tap(importButton);
+    expect(imports, 1);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('config import is disabled while a connection is changing', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      scoped(
+        api: SignedOutApi(),
+        child: app(
+          SimpleConnectionPanel(
+            phase: ConnectionPhase.connecting,
+            username: 'vps.example.test',
+            directSubscription: true,
+            onImportConfig: () {},
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    final button = tester.widget<TextButton>(
+      find.byKey(const Key('harmony_import_config')),
+    );
+    expect(button.onPressed, isNull);
+    await tester.pumpWidget(const SizedBox());
+  });
+
   testWidgets(
     'homepage title and subscription copy can be changed without a new screen implementation',
     (tester) async {

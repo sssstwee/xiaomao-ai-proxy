@@ -40,6 +40,7 @@ class SimpleConnectionPanel extends ConsumerWidget {
   final HarmonyUserIssue? issue;
   final HarmonyConfigFreshness configFreshness;
   final VoidCallback? onConfigRefresh;
+  final VoidCallback? onImportConfig;
 
   const SimpleConnectionPanel({
     super.key,
@@ -57,6 +58,7 @@ class SimpleConnectionPanel extends ConsumerWidget {
     this.issue,
     this.configFreshness = const HarmonyConfigFreshness(),
     this.onConfigRefresh,
+    this.onImportConfig,
   });
 
   @override
@@ -236,6 +238,8 @@ class SimpleConnectionPanel extends ConsumerWidget {
         username: username,
         directSubscription: directSubscription,
         onLogout: busy ? null : onLogout,
+        onImportConfig: busy ? null : onImportConfig,
+        showImportHint: directSubscription && hasError && !running,
       ),
     };
     final layout = runtime['home'] as Map? ?? {};
@@ -803,17 +807,21 @@ class _AccountFooter extends ConsumerWidget {
   final String username;
   final bool directSubscription;
   final VoidCallback? onLogout;
+  final VoidCallback? onImportConfig;
+  final bool showImportHint;
 
   const _AccountFooter({
     required this.username,
     this.directSubscription = false,
     this.onLogout,
+    this.onImportConfig,
+    this.showImportHint = false,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final texts = context.appLocalizations;
-    return Row(
+    final account = Row(
       children: [
         Icon(
           directSubscription
@@ -854,6 +862,27 @@ class _AccountFooter extends ConsumerWidget {
             directSubscription
                 ? texts.harmonyChangeSubscription
                 : remoteHarmonyText(ref, 'harmonyLogout', texts.harmonyLogout),
+          ),
+        ),
+      ],
+    );
+    if (!directSubscription) return account;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        account,
+        if (showImportHint)
+          Text(
+            texts.harmonyConfigImportHint,
+            style: context.textTheme.bodySmall,
+          ),
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton.icon(
+            key: const Key('harmony_import_config'),
+            onPressed: onImportConfig,
+            icon: const Icon(Icons.file_open_outlined, size: 18),
+            label: Text(texts.harmonyImportConfig),
           ),
         ),
       ],

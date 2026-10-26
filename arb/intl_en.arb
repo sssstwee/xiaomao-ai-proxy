@@ -679,5 +679,9 @@
   "harmonySubscriptionUrl": "Subscription URL",
   "harmonySubscriptionInvalid": "Enter a valid HTTPS subscription URL.",
   "harmonyUseSubscription": "Save subscription",
-  "harmonyChangeSubscription": "Change subscription"
+  "harmonyChangeSubscription": "Change subscription",
+  "harmonyImportConfig": "Import config file",
+  "harmonyConfigImportHint": "If the subscription cannot be downloaded, import the config file from your VPS to connect.",
+  "harmonyConfigImportSuccess": "Config imported. Ready to connect.",
+  "harmonyConfigImportFailed": "Unable to import this config. Choose a valid config file no larger than 1 MB."
 }
