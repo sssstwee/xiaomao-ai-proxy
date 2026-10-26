@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:fl_clash/common/harmony_remote_ui.dart';
+import 'package:fl_clash/common/harmony_account.dart';
 import 'package:fl_clash/providers/harmony_home_display.dart';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -25,9 +26,7 @@ class SimpleDashboardView extends ConsumerStatefulWidget {
 class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
     with WidgetsBindingObserver {
   final _formKey = GlobalKey<FormState>();
-  final _username = TextEditingController();
-  final _password = TextEditingController();
-  Timer? _sessionTimer;
+  final _subscription = TextEditingController();
   Timer? _homeTimer;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
   List<ConnectivityResult>? _lastConnectivity;
@@ -41,10 +40,6 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
       unawaited(ref.read(harmonyHomeDisplayProvider.notifier).refresh());
       ref.read(harmonySimpleProvider.notifier).bootstrap();
     });
-    _sessionTimer = Timer.periodic(
-      const Duration(minutes: 15),
-      (_) => ref.read(harmonySimpleProvider.notifier).checkSession(),
-    );
     _homeTimer = Timer.periodic(const Duration(minutes: 1), (_) {
       if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
         unawaited(ref.read(harmonyHomeDisplayProvider.notifier).refresh());
@@ -65,10 +60,8 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _connectivitySub?.cancel();
-    _sessionTimer?.cancel();
     _homeTimer?.cancel();
-    _username.dispose();
-    _password.dispose();
+    _subscription.dispose();
     super.dispose();
   }
 
@@ -80,14 +73,12 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
     }
   }
 
-  Future<void> _login() async {
+  Future<void> _subscribe() async {
     if (!_formKey.currentState!.validate()) return;
     FocusScope.of(context).unfocus();
-    final password = _password.text;
-    _password.clear();
     await ref
         .read(harmonySimpleProvider.notifier)
-        .login(_username.text, password);
+        .subscribe(_subscription.text);
   }
 
   String? _activeNodeName() {
@@ -158,7 +149,13 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
           child: session != null
               ? SimpleConnectionPanel(
                   phase: phase,
-                  username: session.username,
+                  username:
+                      ref
+                          .read(harmonyAccountApiProvider)
+                          .subscriptionUri
+                          ?.host ??
+                      session.username,
+                  directSubscription: true,
                   error: ui.error,
                   usingCachedConfig: ui.usingCachedConfig,
                   nodeName: nodeName,
@@ -170,8 +167,17 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
                             .read(harmonySimpleProvider.notifier)
                             .toggleConnect()
                       : null,
-                  onLogout: () =>
+                  onLogout: () {
+                    _subscription.text =
+                        ref
+                            .read(harmonyAccountApiProvider)
+                            .subscriptionUri
+                            ?.toString() ??
+                        '';
+                    unawaited(
                       ref.read(harmonySimpleProvider.notifier).logout(),
+                    );
+                  },
                   onRetry: () =>
                       ref.read(harmonySimpleProvider.notifier).retryConnect(),
                   configFreshness: ui.homeStatus.configFreshness,
@@ -207,8 +213,8 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
                         Text(
                           remoteHarmonyText(
                             ref,
-                            'harmonyLogin',
-                            texts.harmonyLogin,
+                            'harmonySubscription',
+                            texts.harmonySubscription,
                           ),
                           textAlign: TextAlign.center,
                           style: context.textTheme.headlineSmall,
@@ -217,57 +223,38 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
                         Text(
                           remoteHarmonyText(
                             ref,
-                            'harmonyLoginHint',
-                            texts.harmonyLoginHint,
+                            'harmonySubscriptionHint',
+                            texts.harmonySubscriptionHint,
                           ),
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 32),
                         TextFormField(
-                          controller: _username,
+                          controller: _subscription,
                           enabled: !ui.busy && !ui.bootstrapping,
-                          autofillHints: const [AutofillHints.username],
-                          textInputAction: TextInputAction.next,
-                          autocorrect: false,
-                          decoration: InputDecoration(
-                            labelText: remoteHarmonyText(
-                              ref,
-                              'harmonyUsername',
-                              texts.harmonyUsername,
-                            ),
-                          ),
-                          validator: (value) => value?.trim().isNotEmpty == true
-                              ? null
-                              : remoteHarmonyText(
-                                  ref,
-                                  'harmonyRequired',
-                                  texts.harmonyRequired,
-                                ),
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _password,
-                          enabled: !ui.busy && !ui.bootstrapping,
-                          obscureText: true,
-                          autofillHints: const [AutofillHints.password],
+                          autofillHints: const [],
+                          keyboardType: TextInputType.url,
                           textInputAction: TextInputAction.done,
                           autocorrect: false,
-                          enableSuggestions: false,
                           decoration: InputDecoration(
                             labelText: remoteHarmonyText(
                               ref,
-                              'password',
-                              texts.password,
+                              'harmonySubscriptionUrl',
+                              texts.harmonySubscriptionUrl,
                             ),
                           ),
-                          validator: (value) => value?.isNotEmpty == true
+                          validator: (value) =>
+                              HarmonyAccountApi.parseSubscriptionUrl(
+                                    value ?? '',
+                                  ) !=
+                                  null
                               ? null
                               : remoteHarmonyText(
                                   ref,
-                                  'harmonyRequired',
-                                  texts.harmonyRequired,
+                                  'harmonySubscriptionInvalid',
+                                  texts.harmonySubscriptionInvalid,
                                 ),
-                          onFieldSubmitted: (_) => _login(),
+                          onFieldSubmitted: (_) => _subscribe(),
                         ),
                         const SizedBox(height: 24),
                         FilledButton(
@@ -276,7 +263,7 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
                           ),
                           onPressed: ui.busy || ui.bootstrapping || !ready
                               ? null
-                              : _login,
+                              : _subscribe,
                           child: ui.busy || ui.bootstrapping
                               ? const SizedBox.square(
                                   dimension: 22,
@@ -287,8 +274,8 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
                               : Text(
                                   remoteHarmonyText(
                                     ref,
-                                    'harmonyLogin',
-                                    texts.harmonyLogin,
+                                    'harmonyUseSubscription',
+                                    texts.harmonyUseSubscription,
                                   ),
                                 ),
                         ),

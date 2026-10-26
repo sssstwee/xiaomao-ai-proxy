@@ -4,15 +4,21 @@ CC保镖 is a proxy client for HarmonyOS. CC stands for Claude and Codex, whose 
 
 Download the HAP from [Releases](https://github.com/sssstwee/xiaomao-ai-proxy/releases). If unsigned, sign it with a HarmonyOS debug certificate and profile containing your phone’s UDID, then install it using DevEco Studio with developer mode and USB debugging enabled on your HarmonyOS phone.
 
-## 客户端 API 入口
+## VPS 直连订阅
 
-客户端默认通过 `https://69.17.3.174:8444/api` 访问 VPS HTTPS 反向代理，再由 VPS 转发到 Cloudflare。账号校验、会话和配置存储仍在 Worker / D1。VPS 转发需移除入口的 `/api` 前缀，客户端必须保留该前缀拼接登录、配置和版本接口。
+新鸿蒙客户端首次保存 VPS 的 HTTPS 订阅链接，例如 `https://VPS_IP:8444/<private-token>/vpn.yml`。该链接只存于手机安全存储中；公开 HAP 和源码不包含私人订阅信息。
+
+客户端直接读取 YAML、同一链接下的 `/version` 以及相邻的 `home.json`。账号登录已从手机入口移除，缓存按订阅地址区分。连接、重连和配置刷新沿用原有校验、哈希及 ETag/304 行为。
+
+VPS 使用 [Caddyfile](vps/Caddyfile) 将 HTTPS 请求转发到本机 `127.0.0.1:1024`，由 [订阅服务](vps/subscription-server.py) 读取 `/opt/voyra-subscription/vpn.yml`。首页显示复制自 [home.json](homepage/home.json)，保存为 `/opt/voyra-subscription/home.json`。VPS 是分流规则、节点和 DNS 的配置来源。
+
+旧的 `subscription-push.path` 和 `subscription-push.timer` 已停用。修改 VPS 文件后客户端直接拉取，无需向 Worker 推送。服务端配置改动前备份 Caddyfile、server.py 和 home.json，先执行 `caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile`，再重启订阅服务、重载 Caddy，并核验 HTTPS、版本、ETag 和首页。
 
 安装包默认由 GitHub Actions 从 `main` 手动构建，成功后自动发布到 GitHub Releases（HAP、APP ZIP 和 SHA256SUMS），并保留 Actions 产物。发布任务可单独重试，补发时复用已有产物。本机仅进行测试和静态检查；推送、PR 和临时分支仅运行验证。每次打包仍须先获得用户授权。
 
 首页显示使用独立 [JSON 文件](homepage/home.json)，可配置所有首页文案及现有区块的显示、隐藏和顺序。发布后客户端独立同步，不触发 VPN 或线路重载；使用方式见 [首页配置说明](homepage/README.md)。`GET /v1/home` 仅提供公开显示数据，原登录和私有订阅接口的鉴权保持不变。
 
-## VPS 推送订阅（D1）
+## 旧版 Worker / D1 接口（保留兼容）
 
 VPS 上的完整 YAML 订阅文件是分流配置的来源。电脑直接订阅该文件，文件监听任务将同一份内容推送到 Worker，手机登录后从 Worker 下载。推送和导入时保留订阅已有 AI 组及成员顺序，移除其中名称包含 WARP 的成员；动态 `use` / `include-all*` 成员由 Mihomo 原生 `exclude-filter` 排除 WARP，并保留原有过滤条件。没有静态成员或可用动态来源的 AI 组会拒绝写入。仅将国内兜底规则之后的已有 AI 规则提前到该兜底之前，其他优先级不变；没有国内兜底时保留规则顺序。不会补充新的 AI 节点或回退成员，其余规则、代理组和 DNS 由订阅决定。`applyRoutingPolicy` 仅供离线迁移使用。
 
@@ -73,7 +79,7 @@ WantedBy=timers.target
 
 执行 `systemctl daemon-reload && systemctl enable --now subscription-push.path subscription-push.timer`。更新程序应原子替换 YAML 文件。备份包含敏感配置，勿公开。
 
-## 登录与客户端更新
+## 旧版账号接口与客户端更新
 
 登录响应通过 Better Auth 的官方 after hook 附带新建会话的 `session.expiresAt`，客户端继续使用 `set-auth-token` 的签名令牌，可省去紧接登录的一次 `get-session` 往返。旧服务端缺少该字段时，新客户端仍查询会话；恢复已有登录仍在线校验会话。过期或无效的响应不保存凭据。
 

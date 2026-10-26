@@ -1,0 +1,27 @@
+{
+	storage file_system {
+		root /var/lib/caddy/cc-rsa
+	}
+	auto_https disable_redirects
+	default_sni 69.17.3.174
+	servers {
+		protocols h1 h2
+	}
+}
+https://69.17.3.174:8444 {
+	log {
+		output file /var/lib/caddy/access-8444.log
+		format console
+	}
+	tls {
+		key_type rsa2048
+		issuer acme https://acme-v02.api.letsencrypt.org/directory {
+			profile shortlived
+			preferred_chains {
+				root_common_name "ISRG Root X1"
+			}
+			disable_tlsalpn_challenge
+		}
+	}
+	reverse_proxy 127.0.0.1:1024
+}

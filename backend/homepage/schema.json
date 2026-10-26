@@ -110,7 +110,13 @@
           "simpleDisconnect",
           "simpleErrorState",
           "simpleReady",
-          "simpleRunning"
+          "simpleRunning",
+          "harmonySubscription",
+          "harmonySubscriptionHint",
+          "harmonySubscriptionUrl",
+          "harmonySubscriptionInvalid",
+          "harmonyUseSubscription",
+          "harmonyChangeSubscription"
         ]
       },
       "additionalProperties": {

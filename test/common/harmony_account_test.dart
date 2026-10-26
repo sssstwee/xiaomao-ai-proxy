@@ -228,8 +228,8 @@ ResponseBody jsonBody(
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('default login URL uses the custom host with a single API prefix', () {
-    expect(harmonyApiUrl, 'https://cc-api.tokenforsell.com');
+  test('legacy API base defaults to the VPS origin', () {
+    expect(harmonyApiUrl, 'https://69.17.3.174:8444');
     final http = Dio(BaseOptions(baseUrl: harmonyApiUrl));
     final request = Options().compose(
       http.options,
@@ -237,7 +237,7 @@ void main() {
     );
     expect(
       request.uri.toString(),
-      'https://cc-api.tokenforsell.com/api/auth/sign-in/username',
+      'https://69.17.3.174:8444/api/auth/sign-in/username',
     );
     http.close();
   });

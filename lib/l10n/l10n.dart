@@ -5164,10 +5164,10 @@ class AppLocalizations {
     );
   }
 
-  /// `The account server is unreachable; using your last saved profile. Tap the icon above to connect; we will refresh when the network is back.`
+  /// `The VPS subscription is unreachable; using saved routes. You can connect now and refresh when the network recovers.`
   String get harmonyIssueDetailOfflineCached {
     return Intl.message(
-      'The account server is unreachable; using your last saved profile. Tap the icon above to connect; we will refresh when the network is back.',
+      'The VPS subscription is unreachable; using saved routes. You can connect now and refresh when the network recovers.',
       name: 'harmonyIssueDetailOfflineCached',
       desc: '',
       args: [],
@@ -5194,10 +5194,10 @@ class AppLocalizations {
     );
   }
 
-  /// `You are signed in, but connection settings are not ready. Tap the icon above to retry. Cached settings can still be used if available.`
+  /// `The route configuration is not ready. Tap the icon above to retry, or connect with cached routes.`
   String get harmonyIssueDetailSubscription {
     return Intl.message(
-      'You are signed in, but connection settings are not ready. Tap the icon above to retry. Cached settings can still be used if available.',
+      'The route configuration is not ready. Tap the icon above to retry, or connect with cached routes.',
       name: 'harmonyIssueDetailSubscription',
       desc: '',
       args: [],
@@ -5314,10 +5314,10 @@ class AppLocalizations {
     );
   }
 
-  /// `Cannot reach the account server. Check your network; with a cached profile, you can still tap the icon above to connect.`
+  /// `Cannot reach the VPS subscription service. Check your network or try connecting with cached routes.`
   String get harmonyIssueDetailService {
     return Intl.message(
-      'Cannot reach the account server. Check your network; with a cached profile, you can still tap the icon above to connect.',
+      'Cannot reach the VPS subscription service. Check your network or try connecting with cached routes.',
       name: 'harmonyIssueDetailService',
       desc: '',
       args: [],
@@ -5344,10 +5344,10 @@ class AppLocalizations {
     );
   }
 
-  /// `Please wait about a minute before signing in or connecting again.`
+  /// `Please wait about a minute before refreshing the subscription or connecting again.`
   String get harmonyIssueDetailRateLimit {
     return Intl.message(
-      'Please wait about a minute before signing in or connecting again.',
+      'Please wait about a minute before refreshing the subscription or connecting again.',
       name: 'harmonyIssueDetailRateLimit',
       desc: '',
       args: [],
@@ -5359,6 +5359,66 @@ class AppLocalizations {
     return Intl.message(
       'Next: wait, then retry',
       name: 'harmonyIssueActionRateLimit',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `VPS subscription`
+  String get harmonySubscription {
+    return Intl.message(
+      'VPS subscription',
+      name: 'harmonySubscription',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Paste the HTTPS subscription URL provided by your VPS to get started.`
+  String get harmonySubscriptionHint {
+    return Intl.message(
+      'Paste the HTTPS subscription URL provided by your VPS to get started.',
+      name: 'harmonySubscriptionHint',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Subscription URL`
+  String get harmonySubscriptionUrl {
+    return Intl.message(
+      'Subscription URL',
+      name: 'harmonySubscriptionUrl',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Enter a valid HTTPS subscription URL.`
+  String get harmonySubscriptionInvalid {
+    return Intl.message(
+      'Enter a valid HTTPS subscription URL.',
+      name: 'harmonySubscriptionInvalid',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Save subscription`
+  String get harmonyUseSubscription {
+    return Intl.message(
+      'Save subscription',
+      name: 'harmonyUseSubscription',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Change subscription`
+  String get harmonyChangeSubscription {
+    return Intl.message(
+      'Change subscription',
+      name: 'harmonyChangeSubscription',
       desc: '',
       args: [],
     );

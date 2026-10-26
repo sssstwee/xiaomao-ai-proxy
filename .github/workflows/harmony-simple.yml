@@ -172,21 +172,10 @@ jobs:
 
       - name: Build unsigned HarmonyOS packages
         if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
-        env:
-          CLASH_HARMONY_API_URL: ${{ vars.CLASH_HARMONY_API_URL }}
         run: |
           set -euo pipefail
-          API_URL="${CLASH_HARMONY_API_URL:-https://69.17.3.174:8444/api}"
+          # Private subscription URLs are configured on the device.
           cp env.json.example env.json
-          API_URL="$API_URL" python3 - <<'PY'
-          import json, os
-          with open("env.json") as f:
-              data = json.load(f)
-          data["CLASH_HARMONY_API_URL"] = os.environ["API_URL"]
-          with open("env.json", "w") as f:
-              json.dump(data, f, indent=2)
-              f.write("\n")
-          PY
           dart setup.dart ohos --env stable -v
 
       - name: Checksums
