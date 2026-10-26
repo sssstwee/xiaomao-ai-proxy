@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:fl_clash/common/harmony_remote_ui.dart';
 import 'package:fl_clash/common/harmony_account.dart';
 import 'package:fl_clash/providers/harmony_home_display.dart';
+import 'package:fl_clash/state.dart';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:fl_clash/common/common.dart';
@@ -30,6 +31,7 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
   Timer? _homeTimer;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
   List<ConnectivityResult>? _lastConnectivity;
+  bool _importingConfig = false;
 
   @override
   void initState() {
@@ -67,7 +69,7 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
+    if (state == AppLifecycleState.resumed && !_importingConfig) {
       unawaited(ref.read(harmonyHomeDisplayProvider.notifier).refresh());
       unawaited(ref.read(harmonySimpleProvider.notifier).onAppResumed());
     }
@@ -79,6 +81,38 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
     await ref
         .read(harmonySimpleProvider.notifier)
         .subscribe(_subscription.text);
+  }
+
+  Future<void> _importConfig() async {
+    if (_importingConfig) return;
+    setState(() => _importingConfig = true);
+    try {
+      final file = await picker.pickerFile();
+      if (file == null || !mounted) return;
+      if (await file.length() > harmonyConfigMaxBytes) {
+        throw const FormatException('Config exceeds size limit');
+      }
+      final bytes = await file.readBytes();
+      if (!mounted) return;
+      final imported = await ref
+          .read(harmonySimpleProvider.notifier)
+          .importConfig(bytes);
+      if (mounted) {
+        globalState.showNotifier(
+          imported
+              ? context.appLocalizations.harmonyConfigImportSuccess
+              : context.appLocalizations.harmonyConfigImportFailed,
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        globalState.showNotifier(
+          context.appLocalizations.harmonyConfigImportFailed,
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _importingConfig = false);
+    }
   }
 
   String? _activeNodeName() {
@@ -180,6 +214,14 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
                   },
                   onRetry: () =>
                       ref.read(harmonySimpleProvider.notifier).retryConnect(),
+                  onImportConfig:
+                      ready &&
+                          !ui.busy &&
+                          !ui.bootstrapping &&
+                          !ui.homeStatus.configSyncInProgress &&
+                          !_importingConfig
+                      ? _importConfig
+                      : null,
                   configFreshness: ui.homeStatus.configFreshness,
                   onConfigRefresh: features['manualRefresh'] == false
                       ? null

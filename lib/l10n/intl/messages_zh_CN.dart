@@ -345,6 +345,15 @@ class MessageLookup extends MessageLookupByLibrary {
     "harmonyConfigFreshUpdating": MessageLookupByLibrary.simpleMessage(
       "发现新配置，正在更新…",
     ),
+    "harmonyConfigImportFailed": MessageLookupByLibrary.simpleMessage(
+      "无法导入此配置，请选择有效的配置文件（不超过 1 MB）。",
+    ),
+    "harmonyConfigImportHint": MessageLookupByLibrary.simpleMessage(
+      "无法下载订阅时，可导入 VPS 提供的配置文件后连接。",
+    ),
+    "harmonyConfigImportSuccess": MessageLookupByLibrary.simpleMessage(
+      "配置已导入，可以连接。",
+    ),
     "harmonyConfigPreparing": MessageLookupByLibrary.simpleMessage("正在准备连接配置…"),
     "harmonyConfigRefreshDebounced": MessageLookupByLibrary.simpleMessage(
       "请稍后再试",
@@ -368,6 +377,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "harmonyHealthCheckFailed": m13,
     "harmonyHealthCheckOk": m14,
     "harmonyHealthLabel": MessageLookupByLibrary.simpleMessage("连接检查"),
+    "harmonyImportConfig": MessageLookupByLibrary.simpleMessage("导入配置文件"),
     "harmonyIssueActionAuthExpired": MessageLookupByLibrary.simpleMessage(
       "下一步：点「退出登录」后重新登录",
     ),

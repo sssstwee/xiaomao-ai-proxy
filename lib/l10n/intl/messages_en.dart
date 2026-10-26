@@ -479,6 +479,15 @@ class MessageLookup extends MessageLookupByLibrary {
     "harmonyConfigFreshUpdating": MessageLookupByLibrary.simpleMessage(
       "New config found, updating…",
     ),
+    "harmonyConfigImportFailed": MessageLookupByLibrary.simpleMessage(
+      "Unable to import this config. Choose a valid config file no larger than 1 MB.",
+    ),
+    "harmonyConfigImportHint": MessageLookupByLibrary.simpleMessage(
+      "If the subscription cannot be downloaded, import the config file from your VPS to connect.",
+    ),
+    "harmonyConfigImportSuccess": MessageLookupByLibrary.simpleMessage(
+      "Config imported. Ready to connect.",
+    ),
     "harmonyConfigPreparing": MessageLookupByLibrary.simpleMessage(
       "Preparing connection settings…",
     ),
@@ -510,6 +519,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "harmonyHealthCheckFailed": m13,
     "harmonyHealthCheckOk": m14,
     "harmonyHealthLabel": MessageLookupByLibrary.simpleMessage("Health check"),
+    "harmonyImportConfig": MessageLookupByLibrary.simpleMessage(
+      "Import config file",
+    ),
     "harmonyIssueActionAuthExpired": MessageLookupByLibrary.simpleMessage(
       "Next: sign out, then log in again",
     ),

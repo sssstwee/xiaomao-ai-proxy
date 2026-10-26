@@ -1051,6 +1051,9 @@ class HarmonyAccountApi {
       httpClientAdapter: IOHttpClientAdapter(
         createHttpClient: () {
           final client = HttpClient();
+          // Subscription responses carry proxy credentials. Do not inherit the
+          // application's permissive certificate callback for these requests.
+          client.badCertificateCallback = null;
           if (viaLocalProxy && port != null) {
             client.findProxy = (_) => 'PROXY localhost:$port';
           } else {

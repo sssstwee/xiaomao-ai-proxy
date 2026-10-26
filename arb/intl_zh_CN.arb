@@ -679,5 +679,9 @@
   "harmonySubscriptionUrl": "订阅地址",
   "harmonySubscriptionInvalid": "请输入有效的 HTTPS 订阅地址。",
   "harmonyUseSubscription": "保存订阅",
-  "harmonyChangeSubscription": "更换订阅"
+  "harmonyChangeSubscription": "更换订阅",
+  "harmonyImportConfig": "导入配置文件",
+  "harmonyConfigImportHint": "无法下载订阅时，可导入 VPS 提供的配置文件后连接。",
+  "harmonyConfigImportSuccess": "配置已导入，可以连接。",
+  "harmonyConfigImportFailed": "无法导入此配置，请选择有效的配置文件（不超过 1 MB）。"
 }

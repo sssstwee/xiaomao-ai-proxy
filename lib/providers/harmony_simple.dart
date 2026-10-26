@@ -203,7 +203,7 @@ class HarmonySimple extends _$HarmonySimple {
       if (operation == _operation && ref.mounted) {
         if (error == HarmonyAccountError.expired) {
           await logout(expired: true);
-        } else if (error != HarmonyAccountError.unavailable) {
+        } else {
           state = state.copyWith(
             error: _message(error),
             issue: harmonyUserIssueFromAccount(error),
@@ -315,6 +315,69 @@ class HarmonySimple extends _$HarmonySimple {
         state = state.copyWith(
           busy: false,
           error: currentAppLocalizations.harmonySubscriptionInvalid,
+        );
+      }
+    }
+  }
+
+  Future<bool> importConfig(Uint8List bytes) async {
+    final session = _api.session;
+    if (state.busy ||
+        _restoring ||
+        state.homeStatus.configSyncInProgress ||
+        session == null) {
+      return false;
+    }
+    final operation = ++_operation;
+    state = state.copyWith(
+      busy: true,
+      session: session,
+      clearError: true,
+      clearIssue: true,
+    );
+    try {
+      if (bytes.isEmpty || bytes.length > harmonyConfigMaxBytes) {
+        throw HarmonyAccountError.config;
+      }
+      await _syncRemoteProfile(
+        fallbackOnNetworkError: false,
+        operation: operation,
+        hotApplyWhenConnected: true,
+        manualRefresh: true,
+        importedBytes: Uint8List.fromList(bytes),
+      );
+      _ensureCurrent(operation, session.token);
+      state = state.copyWith(clearError: true, clearIssue: true);
+      _scheduleVersionCheck();
+      return true;
+    } on _SupersededHarmonyOperation {
+      return false;
+    } on HarmonyAccountError catch (error) {
+      if (ref.mounted && operation == _operation) {
+        if (error == HarmonyAccountError.expired) {
+          await logout(expired: true);
+        } else {
+          state = state.copyWith(
+            error: _message(error),
+            issue: harmonyUserIssueFromAccount(error),
+          );
+        }
+      }
+      return false;
+    } catch (_) {
+      if (ref.mounted && operation == _operation) {
+        state = state.copyWith(
+          error: _message(HarmonyAccountError.config),
+          issue: HarmonyUserIssue.subscriptionUnreachable,
+        );
+      }
+      return false;
+    } finally {
+      if (ref.mounted && operation == _operation) {
+        state = state.copyWith(
+          busy: false,
+          bootstrapping: false,
+          homeStatus: state.homeStatus.copyWith(configSyncInProgress: false),
         );
       }
     }
@@ -812,6 +875,7 @@ class HarmonySimple extends _$HarmonySimple {
     bool skipConditionals = false,
     bool hotApplyWhenConnected = false,
     bool manualRefresh = false,
+    Uint8List? importedBytes,
   }) async {
     final session = _api.session;
     if (session == null) {
@@ -837,19 +901,28 @@ class HarmonySimple extends _$HarmonySimple {
           usingCachedConfig: false,
         );
       }
-      stage = 'download';
-      var download = await _api.downloadConfig(
-        ifModifiedSince: skipConditionals
-            ? null
-            : cached != null
-            ? metadata?.lastModified ?? await _api.readConfigLastModified()
-            : null,
-        ifNoneMatch: skipConditionals
-            ? null
-            : cached != null
-            ? metadata?.etag
-            : null,
-      );
+      stage = importedBytes == null ? 'download' : 'import';
+      var download = importedBytes == null
+          ? await _api.downloadConfig(
+              ifModifiedSince: skipConditionals
+                  ? null
+                  : cached != null
+                  ? metadata?.lastModified ??
+                        await _api.readConfigLastModified()
+                  : null,
+              ifNoneMatch: skipConditionals
+                  ? null
+                  : cached != null
+                  ? metadata?.etag
+                  : null,
+            )
+          : HarmonyConfigDownload(
+              bytes: importedBytes,
+              configVersion: sha256
+                  .convert(importedBytes)
+                  .toString()
+                  .substring(0, 16),
+            );
       _ensureCurrent(op, session.token);
       if (download.notModified) {
         final current = await _verifiedCachedProfile(metadata);
@@ -867,7 +940,10 @@ class HarmonySimple extends _$HarmonySimple {
         _ensureCurrent(op, session.token);
       }
       final bytes = download.bytes;
-      if (download.notModified || bytes == null || bytes.isEmpty) {
+      if (download.notModified ||
+          bytes == null ||
+          bytes.isEmpty ||
+          bytes.length > harmonyConfigMaxBytes) {
         throw HarmonyAccountError.config;
       }
       stage = 'parse-config';

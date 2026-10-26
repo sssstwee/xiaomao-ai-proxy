@@ -50,6 +50,7 @@ class _Api extends HarmonyAccountApi {
   HarmonyConfigCacheMetadata? metadata;
   final downloads = <Object>[];
   final requests = <({String? etag, String? lastModified})>[];
+  final validatorWrites = <({String? etag, String? version})>[];
   Object? loginFailure;
   Object? logoutFailure;
   Object? commitFailure;
@@ -163,7 +164,9 @@ class _Api extends HarmonyAccountApi {
     String? lastModified,
     String? etag,
     String? configVersion,
-  }) async {}
+  }) async {
+    validatorWrites.add((etag: etag, version: configVersion));
+  }
 
   @override
   Future<Duration> readConfigRefreshInterval({
@@ -518,6 +521,226 @@ void main() {
     );
     expect(harness.state.busy, isFalse);
     expect(harness.state.session, isNull);
+  });
+
+  test('first bootstrap download failure exposes a retryable error', () async {
+    final harness = _Harness();
+    harness.api.downloads.add(HarmonyAccountError.unavailable);
+
+    await harness.notifier.bootstrap();
+
+    expect(harness.state.error, AppLocalizations.current.harmonyServiceError);
+    expect(harness.state.issue, HarmonyUserIssue.serviceUnreachable);
+    expect(harness.state.session?.username, 'alice');
+    expect(harness.state.remoteProfile, isNull);
+    expect(harness.state.bootstrapping, isFalse);
+    expect(harness.state.homeStatus.configSyncInProgress, isFalse);
+  });
+
+  test('local import prepares a versioned cache without downloading', () async {
+    final harness = _Harness();
+
+    expect(await harness.notifier.importConfig(_config), isTrue);
+
+    final profile = harness.state.remoteProfile!;
+    final digest = sha256.convert(_config).toString();
+    expect(harness.api.requests, isEmpty);
+    expect(harness.files.bytes[profile.id], _config);
+    expect(harness.api.metadata?.profileId, profile.id);
+    expect(harness.api.metadata?.username, 'alice');
+    expect(harness.api.metadata?.contentHash, digest);
+    expect(harness.api.validatorWrites.single, (
+      etag: null,
+      version: digest.substring(0, 16),
+    ));
+    expect(harness.state.error, isNull);
+    expect(harness.state.issue, isNull);
+    expect(harness.state.busy, isFalse);
+    expect(harness.state.bootstrapping, isFalse);
+    expect(harness.state.homeStatus.configSyncInProgress, isFalse);
+    expect(harness.setup.starts, isEmpty);
+    expect(harness.events, ['core-ready', 'save', 'put', 'commit']);
+  });
+
+  test('an imported cache survives restoration and connects offline', () async {
+    final first = _Harness();
+    expect(await first.notifier.importConfig(_config), isTrue);
+    final profile = first.state.remoteProfile!;
+    final restarted = _Harness(initial: [profile]);
+    restarted.api.metadata = first.api.metadata;
+    restarted.files.bytes[profile.id] = first.files.bytes[profile.id]!;
+    restarted.api.downloads.add(HarmonyAccountError.unavailable);
+    restarted.api.versionFailure = HarmonyAccountError.unavailable;
+
+    await restarted.notifier.bootstrap();
+
+    expect(restarted.state.remoteProfile?.id, profile.id);
+    expect(restarted.state.usingCachedConfig, isTrue);
+    expect(restarted.files.deleted, isEmpty);
+    restarted.api.requests.clear();
+    restarted.installRoute();
+
+    await restarted.notifier.toggleConnect();
+
+    expect(restarted.api.requests, isEmpty);
+    expect(restarted.setup.starts, hasLength(1));
+    expect(restarted.container.read(isStartProvider), isTrue);
+    expect(restarted.state.error, isNull);
+    expect(restarted.state.busy, isFalse);
+  });
+
+  for (final failure in [
+    'empty',
+    'too-large',
+    'malformed',
+    'core-rejection',
+    'cache-write',
+  ]) {
+    test('local import $failure preserves the accepted cache', () async {
+      final harness = _Harness(initial: [_profile()]);
+      harness.cache();
+      harness.api.downloads.add(const HarmonyConfigDownload(notModified: true));
+      await harness.notifier.bootstrap();
+      final previousMetadata = harness.api.metadata;
+      harness.api.requests.clear();
+      final bytes = switch (failure) {
+        'empty' => Uint8List(0),
+        'too-large' => Uint8List(harmonyConfigMaxBytes + 1),
+        'malformed' => Uint8List.fromList('{"proxies": ['.codeUnits),
+        _ => Uint8List.fromList('proxies: []\nrules: []\n'.codeUnits),
+      };
+      if (failure == 'core-rejection') {
+        harness.files.saveFailure = HarmonyAccountError.config;
+      }
+      if (failure == 'cache-write') {
+        harness.api.commitFailure = StateError('keystore unavailable');
+      }
+
+      expect(await harness.notifier.importConfig(bytes), isFalse);
+
+      expect(harness.api.requests, isEmpty);
+      expect(harness.api.metadata, same(previousMetadata));
+      expect(harness.files.bytes[7], _config);
+      expect(harness.container.read(currentProfileIdProvider), 7);
+      expect(harness.state.remoteProfile?.id, 7);
+      expect(harness.state.error, AppLocalizations.current.harmonyConfigError);
+      expect(harness.state.busy, isFalse);
+      expect(harness.state.bootstrapping, isFalse);
+      expect(harness.state.homeStatus.configSyncInProgress, isFalse);
+      expect(harness.setup.starts, isEmpty);
+    });
+  }
+
+  test('local import requires a configured session', () async {
+    final harness = _Harness();
+    harness.api.session = null;
+
+    expect(await harness.notifier.importConfig(_config), isFalse);
+
+    expect(harness.events, isEmpty);
+    expect(harness.api.metadata, isNull);
+    expect(harness.state.busy, isFalse);
+  });
+
+  test('local import does not overlap bootstrap or another import', () async {
+    final harness = _Harness();
+    final downloading = Completer<void>();
+    final response = Completer<HarmonyConfigDownload>();
+    harness.api.downloadStarted = downloading.complete;
+    harness.api.downloads.add(response.future);
+    final restoring = harness.notifier.bootstrap();
+    await downloading.future;
+
+    expect(await harness.notifier.importConfig(_config), isFalse);
+    expect(harness.files.bytes, isEmpty);
+    response.completeError(HarmonyAccountError.unavailable);
+    await restoring;
+
+    final saving = Completer<void>();
+    final releaseSave = Completer<void>();
+    harness.files.saveHook = (_, _) {
+      saving.complete();
+      return releaseSave.future;
+    };
+    final importing = harness.notifier.importConfig(_config);
+    await saving.future;
+
+    expect(harness.state.busy, isTrue);
+    expect(harness.state.homeStatus.configSyncInProgress, isTrue);
+    expect(await harness.notifier.importConfig(_config), isFalse);
+    releaseSave.complete();
+    expect(await importing, isTrue);
+    expect(harness.api.commits, 1);
+    expect(harness.state.busy, isFalse);
+    expect(harness.state.bootstrapping, isFalse);
+    expect(harness.state.error, isNull);
+  });
+
+  test('local import cannot race an in-flight refresh save', () async {
+    final harness = _Harness(initial: [_profile()]);
+    harness.cache();
+    harness.api.downloads.add(const HarmonyConfigDownload(notModified: true));
+    await harness.notifier.bootstrap();
+    final refreshed = Uint8List.fromList('proxies: []\nrules: []\n'.codeUnits);
+    final imported = Uint8List.fromList('proxies: []\nrules: []\n\n'.codeUnits);
+    harness.api.downloads.add(HarmonyConfigDownload(bytes: refreshed));
+    final saving = Completer<void>();
+    final releaseSave = Completer<void>();
+    var saves = 0;
+    harness.files.saveHook = (_, _) {
+      saves++;
+      if (!saving.isCompleted) saving.complete();
+      return releaseSave.future;
+    };
+    final refreshing = harness.notifier.forceRefreshConfig();
+    await saving.future;
+    final importing = harness.notifier.importConfig(imported);
+    try {
+      expect(harness.state.busy, isFalse);
+      expect(harness.state.homeStatus.configSyncInProgress, isTrue);
+      expect(await importing.timeout(const Duration(seconds: 1)), isFalse);
+      expect(saves, 1);
+      expect(harness.files.bytes[7], _config);
+      expect(harness.api.commits, 0);
+    } finally {
+      releaseSave.complete();
+      await importing;
+      await refreshing;
+    }
+
+    expect(harness.files.bytes[7], refreshed);
+    expect(
+      harness.api.metadata?.contentHash,
+      sha256.convert(refreshed).toString(),
+    );
+    expect(harness.api.commits, 1);
+    expect(harness.state.busy, isFalse);
+    expect(harness.state.homeStatus.configSyncInProgress, isFalse);
+  });
+
+  test('logout joins a local import without restoring its cache', () async {
+    final harness = _Harness();
+    final saving = Completer<void>();
+    final releaseSave = Completer<void>();
+    harness.files.saveHook = (_, _) {
+      saving.complete();
+      return releaseSave.future;
+    };
+    final importing = harness.notifier.importConfig(_config);
+    await saving.future;
+    final loggingOut = harness.notifier.logout();
+    releaseSave.complete();
+
+    expect(await importing, isFalse);
+    await loggingOut;
+
+    expect(harness.api.commits, 0);
+    expect(harness.api.requests, isEmpty);
+    expect(harness.files.bytes, isEmpty);
+    expect(harness.state.session, isNull);
+    expect(harness.state.remoteProfile, isNull);
+    expect(harness.state.busy, isFalse);
+    expect(harness.state.homeStatus.configSyncInProgress, isFalse);
   });
 
   for (final failure in ['download', 'validation', 'cache']) {
