@@ -17,7 +17,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// Override the API base with CLASH_HARMONY_API_URL (see `env.json.example`).
 const harmonyApiUrl = String.fromEnvironment(
   'CLASH_HARMONY_API_URL',
-  defaultValue: 'https://69.17.3.174:8444/api',
+  defaultValue: 'https://clash-harmony-api.pages.dev',
 );
 
 const harmonyConfigPath = '/v1/config';

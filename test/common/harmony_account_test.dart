@@ -228,6 +228,17 @@ ResponseBody jsonBody(
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  test('default login URL uses Pages with a single API prefix', () {
+    expect(harmonyApiUrl, 'https://clash-harmony-api.pages.dev');
+    final http = Dio(BaseOptions(baseUrl: harmonyApiUrl));
+    final request = Options().compose(http.options, '/api/auth/sign-in/username');
+    expect(
+      request.uri.toString(),
+      'https://clash-harmony-api.pages.dev/api/auth/sign-in/username',
+    );
+    http.close();
+  });
+
   for (final suffix in ['', '/']) {
     test(
       'public homepage JSON keeps the VPS prefix and does not send the session$suffix',
