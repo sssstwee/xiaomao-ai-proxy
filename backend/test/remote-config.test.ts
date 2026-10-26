@@ -32,7 +32,7 @@ beforeEach(async () => {
   const hash = await hashPassword(password);
   const date = new Date().toISOString();
   await env.DB.batch([
-    env.DB.prepare('INSERT INTO user (id,name,email,emailVerified,createdAt,updatedAt,username,displayUsername) VALUES (?,?,?,?,?,?,?,?)').bind('test-user', 'tester', 'tester@example.invalid', 0, date, date, 'tester', 'tester'),
+    env.DB.prepare('INSERT INTO user (id,name,email,emailVerified,createdAt,updatedAt,username,displayUsername) VALUES (?,?,?,?,?,?,?,?)').bind('test-user', 'harmony', 'tester@example.invalid', 0, date, date, 'harmony', 'harmony'),
     env.DB.prepare('INSERT INTO account (id,accountId,providerId,userId,password,createdAt,updatedAt) VALUES (?,?,?,?,?,?,?)').bind('test-account', 'test-user', 'credential', 'test-user', hash, date, date),
     env.DB.prepare('INSERT INTO proxy_config (scope, scope_key, content, updated_at) VALUES (?,?,?,?)').bind('default', '', 'proxies: []', date),
   ]);
@@ -41,7 +41,7 @@ beforeEach(async () => {
 async function login() {
   const response = await request('/api/auth/sign-in/username', {
     method: 'POST', headers: { 'Content-Type': 'application/json', 'cf-connecting-ip': '192.0.2.9' },
-    body: JSON.stringify({ username: 'tester', password }),
+    body: JSON.stringify({ username: 'harmony', password }),
   });
   expect(response.status).toBe(200);
   await response.json();
@@ -90,7 +90,7 @@ test('user key overrides group and default', async () => {
   await env.DB.prepare('UPDATE user SET config_group = ? WHERE id = ?').bind('g1', 'test-user').run();
   const token = await login();
   expect((await (await request('/v1/config/version', { headers: bearer(token) })).json() as { version: string }).version).toBe('g');
-  await kv().put('user:tester', JSON.stringify(envelope('u')));
+  await kv().put('user:harmony', JSON.stringify(envelope('u')));
   expect((await (await request('/v1/config/version', { headers: bearer(token) })).json() as { version: string }).version).toBe('u');
 });
 
