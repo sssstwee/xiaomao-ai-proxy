@@ -9,12 +9,7 @@ export function createAuth(env: Env, nativeBearerFlow = false) {
     baseURL: env.AUTH_ORIGIN,
     secret: env.BETTER_AUTH_SECRET,
     database: { dialect: new D1Dialect({ database: env.DB }), type: 'sqlite' },
-    emailAndPassword: {
-      enabled: true,
-      disableSignUp: true,
-      // AUTH_BYPASS temporary: issue real sessions without checking passwords.
-      password: { verify: async () => true },
-    },
+    emailAndPassword: { enabled: true, disableSignUp: true },
     session: { expiresIn: 60 * 60 * 24 * 7, updateAge: 60 * 60 * 24 },
     hooks: {
       after: createAuthMiddleware(async (ctx) => {
@@ -27,9 +22,10 @@ export function createAuth(env: Env, nativeBearerFlow = false) {
         }
       }),
     },
-    // AUTH_BYPASS temporary: shared VPS egress must not block phone logins.
+    // Database-backed limits stay consistent across isolates; /v1/config uses a
+    // separate D1 counter so config polling does not compete with auth keys.
     rateLimit: {
-      enabled: false,
+      enabled: true,
       storage: 'database',
       window: 60,
       max: 30,
