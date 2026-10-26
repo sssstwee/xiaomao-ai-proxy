@@ -77,14 +77,21 @@ try:
             or (name.startswith('private-config') and name.endswith('.json'))
         ):
             reasons.append('private configuration file must not be tracked')
-        if b'tokenforsell' in content.lower():
-            reasons.append('known leaked hostname fragment')
         # This public client endpoint is intentionally shipped in the app.
         public_api_paths = {
             'lib/common/harmony_account.dart',
             'env.json.example',
             'test/common/harmony_account_test.dart',
         }
+        hostname_content = content.lower()
+        if path in public_api_paths:
+            hostname_content = re.sub(
+                rb'https://cc-api\.tokenforsell\.com(?![a-z0-9._-]|:[0-9]|@)',
+                b'',
+                hostname_content,
+            )
+        if b'tokenforsell' in hostname_content:
+            reasons.append('known leaked hostname fragment')
         deployment_urls = host.findall(content)
         if path in public_api_paths:
             deployment_urls = [
