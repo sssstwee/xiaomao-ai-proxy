@@ -231,7 +231,10 @@ void main() {
   test('default login URL uses Pages with a single API prefix', () {
     expect(harmonyApiUrl, 'https://clash-harmony-api.pages.dev');
     final http = Dio(BaseOptions(baseUrl: harmonyApiUrl));
-    final request = Options().compose(http.options, '/api/auth/sign-in/username');
+    final request = Options().compose(
+      http.options,
+      '/api/auth/sign-in/username',
+    );
     expect(
       request.uri.toString(),
       'https://clash-harmony-api.pages.dev/api/auth/sign-in/username',
