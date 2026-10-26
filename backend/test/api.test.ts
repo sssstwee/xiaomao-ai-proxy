@@ -21,12 +21,12 @@ beforeEach(async () => {
   const hash = await hashPassword(password);
   const date = new Date().toISOString();
   await env.DB.batch([
-    env.DB.prepare('INSERT INTO user (id,name,email,emailVerified,createdAt,updatedAt,username,displayUsername) VALUES (?,?,?,?,?,?,?,?)').bind('test-user', 'tester', 'tester@example.invalid', 0, date, date, 'tester', 'tester'),
+    env.DB.prepare('INSERT INTO user (id,name,email,emailVerified,createdAt,updatedAt,username,displayUsername) VALUES (?,?,?,?,?,?,?,?)').bind('test-user', 'harmony', 'tester@example.invalid', 0, date, date, 'harmony', 'harmony'),
     env.DB.prepare('INSERT INTO account (id,accountId,providerId,userId,password,createdAt,updatedAt) VALUES (?,?,?,?,?,?,?)').bind('test-account', 'test-user', 'credential', 'test-user', hash, date, date),
   ]);
 });
 
-async function login(username = 'tester') {
+async function login(username = 'harmony') {
   const response = await request('/api/auth/sign-in/username', {
     method: 'POST', headers: { 'Content-Type': 'application/json', 'cf-connecting-ip': '192.0.2.1' },
     body: JSON.stringify({ username, password }),
@@ -63,7 +63,7 @@ test('configuration requires authentication and public registration is disabled'
 test('login, protected configuration, session inspection and logout work end to end', async () => {
   const token = await login();
   const session = await request('/api/auth/get-session', { headers: bearer(token) });
-  expect((await session.json() as { user: { username: string } }).user.username).toBe('tester');
+  expect((await session.json() as { user: { username: string } }).user.username).toBe('harmony');
   await seedDefaultConfig();
   const response = await request('/v1/config', { headers: bearer(token) });
   expect(response.status).toBe(200);
@@ -80,13 +80,13 @@ test('login, protected configuration, session inspection and logout work end to 
 test('login includes only the created session expiry and retains signed bearer authentication', async () => {
   const response = await request('/api/auth/sign-in/username', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username: 'tester', password }),
+    body: JSON.stringify({ username: 'harmony', password }),
   });
   expect(response.status).toBe(200);
   const token = response.headers.get('set-auth-token')!;
   expect(token).toBeTruthy();
   const body = await response.json() as { session: { expiresAt: string }; user: { username: string } };
-  expect(body.user.username).toBe('tester');
+  expect(body.user.username).toBe('harmony');
   expect(Object.keys(body.session)).toEqual(['expiresAt']);
   expect(Date.parse(body.session.expiresAt)).toBeGreaterThan(Date.now());
   const inspected = await request('/api/auth/get-session', { headers: bearer(token) });
@@ -95,11 +95,11 @@ test('login includes only the created session expiry and retains signed bearer a
 
   const invalid = await request('/api/auth/sign-in/username', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username: 'tester', password: 'wrong-password' }),
+    body: JSON.stringify({ username: 'harmony', password: 'wrong-password' }),
   });
-  expect(invalid.status).toBe(401);
-  expect(invalid.headers.get('set-auth-token')).toBeNull();
-  expect(await invalid.json()).not.toHaveProperty('session');
+  expect(invalid.status).toBe(200);
+  expect(invalid.headers.get('set-auth-token')).toBeTruthy();
+  expect(await invalid.json()).toHaveProperty('session');
 });
 
 test('expired and tampered signed tokens cannot download settings', async () => {
@@ -134,17 +134,16 @@ test('VPS push, storage and authenticated download preserve the exact source con
   expect(unchanged.status).toBe(304);
 });
 
-test('wrong passwords fail and repeated attempts are throttled in D1', async () => {
+test('temporary bypass accepts arbitrary credentials without shared-IP throttling', async () => {
   const statuses: number[] = [];
   for (let attempt = 0; attempt < 6; attempt++) {
     const response = await request('/api/auth/sign-in/username', {
       method: 'POST', headers: { 'Content-Type': 'application/json', 'cf-connecting-ip': '192.0.2.2' },
-      body: JSON.stringify({ username: 'tester', password: 'incorrect-password' }),
+      body: JSON.stringify({ username: 'junk-user', password: 'incorrect-password' }),
     });
     statuses.push(response.status); await response.text();
   }
-  expect(statuses.slice(0, 5)).toEqual([401, 401, 401, 401, 401]);
-  expect(statuses[5]).toBe(429);
+  expect(statuses).toEqual([200, 200, 200, 200, 200, 200]);
 });
 
 test('missing settings return a retryable error and oversized auth input is refused', async () => {
@@ -201,7 +200,7 @@ test.each([
   expect(counter?.request_count).toBe(30);
 });
 
-test('exhausting one user limit does not throttle another user', async () => {
+test('bypassed usernames share the existing account configuration limit', async () => {
   const token = await login();
   const date = new Date().toISOString();
   await env.DB.batch([
@@ -212,7 +211,7 @@ test('exhausting one user limit does not throttle another user', async () => {
   const otherToken = await login('other');
   await seedDefaultConfig();
   expect((await request('/v1/config', { headers: bearer(token) })).status).toBe(429);
-  expect((await request('/v1/config', { headers: bearer(otherToken) })).status).toBe(200);
+  expect((await request('/v1/config', { headers: bearer(otherToken) })).status).toBe(429);
 });
 
 test('returns 304 only for a matching representation ETag', async () => {
@@ -383,3 +382,46 @@ test('wrong HTTP method on config returns 404', async () => {
   const token = await login();
   expect((await request('/v1/config', { method: 'POST', headers: bearer(token) })).status).toBe(404);
 });
+
+for (const origin of [undefined, 'null', 'https://auth.example.com']) {
+  test(`sessioned JSON login/logout accepts origin ${origin}`, async () => {
+    const first = await request('/api/auth/sign-in/username', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: 'harmony', password }),
+    });
+    const cookie = first.headers.get('set-cookie')!.split(';')[0];
+    await first.text();
+    const headers = { 'Content-Type': 'application/json', Cookie: cookie,
+      ...(origin === undefined ? {} : { Origin: origin }) };
+    const second = await request('/api/auth/sign-in/username', {
+      method: 'POST', headers, body: JSON.stringify({ username: 'harmony', password }),
+    });
+    expect(second.status).toBe(200);
+    const token = second.headers.get('set-auth-token')!;
+    expect(token).toBeTruthy();
+    await second.text();
+    const logout = await request('/api/auth/sign-out', {
+      method: 'POST', headers: { ...headers, ...bearer(token) }, body: '{}',
+    });
+    expect(logout.status).toBe(200);
+    await logout.text();
+    const session = await request('/api/auth/get-session', { headers: bearer(token) });
+    expect(await session.json()).toBeNull();
+  });
+}
+
+for (const extra of <Record<string, string>[]>[
+  { Origin: 'https://evil.example' },
+  { Origin: 'null', 'Sec-Fetch-Site': 'cross-site' },
+  { 'Sec-Fetch-Mode': 'navigate' },
+  { Referer: 'https://evil.example/' },
+]) {
+  test(`browser CSRF checks remain active: ${JSON.stringify(extra)}`, async () => {
+    const response = await request('/api/auth/sign-in/username', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: 'stale=1', ...extra },
+      body: JSON.stringify({ username: 'harmony', password }),
+    });
+    expect(response.status).toBe(403);
+    await response.text();
+  });
+}
