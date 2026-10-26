@@ -228,8 +228,8 @@ ResponseBody jsonBody(
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('default login URL uses Pages with a single API prefix', () {
-    expect(harmonyApiUrl, 'https://clash-harmony-api.pages.dev');
+  test('default login URL uses the custom host with a single API prefix', () {
+    expect(harmonyApiUrl, 'https://cc-api.tokenforsell.com');
     final http = Dio(BaseOptions(baseUrl: harmonyApiUrl));
     final request = Options().compose(
       http.options,
@@ -237,7 +237,7 @@ void main() {
     );
     expect(
       request.uri.toString(),
-      'https://clash-harmony-api.pages.dev/api/auth/sign-in/username',
+      'https://cc-api.tokenforsell.com/api/auth/sign-in/username',
     );
     http.close();
   });
