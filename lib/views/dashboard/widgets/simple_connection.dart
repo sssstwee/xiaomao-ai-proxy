@@ -31,6 +31,7 @@ class SimpleConnectionPanel extends ConsumerWidget {
   final VoidCallback? onLogout;
   final VoidCallback? onRetry;
   final String username;
+  final bool directSubscription;
   final String? error;
   final bool usingCachedConfig;
   final String? nodeName;
@@ -44,6 +45,7 @@ class SimpleConnectionPanel extends ConsumerWidget {
     super.key,
     required this.phase,
     required this.username,
+    this.directSubscription = false,
     this.onToggle,
     this.onLogout,
     this.onRetry,
@@ -232,6 +234,7 @@ class SimpleConnectionPanel extends ConsumerWidget {
       ),
       'account': _AccountFooter(
         username: username,
+        directSubscription: directSubscription,
         onLogout: busy ? null : onLogout,
       ),
     };
@@ -798,9 +801,14 @@ class _TrafficStat extends StatelessWidget {
 
 class _AccountFooter extends ConsumerWidget {
   final String username;
+  final bool directSubscription;
   final VoidCallback? onLogout;
 
-  const _AccountFooter({required this.username, this.onLogout});
+  const _AccountFooter({
+    required this.username,
+    this.directSubscription = false,
+    this.onLogout,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -808,26 +816,30 @@ class _AccountFooter extends ConsumerWidget {
     return Row(
       children: [
         Icon(
-          Icons.person_outline_rounded,
+          directSubscription
+              ? Icons.link_rounded
+              : Icons.person_outline_rounded,
           size: 18,
           color: context.colorScheme.onSurfaceVariant,
         ),
         const SizedBox(width: 6),
         Expanded(
           child: Text(
-            remoteHarmonyText(
-              ref,
-              'harmonyAccountValue',
-              '${remoteHarmonyText(ref, 'harmonyAccount', texts.harmonyAccount)}: $username',
-              parameters: {
-                'label': remoteHarmonyText(
-                  ref,
-                  'harmonyAccount',
-                  texts.harmonyAccount,
-                ),
-                'username': username,
-              },
-            ),
+            directSubscription
+                ? '${texts.harmonySubscription}: $username'
+                : remoteHarmonyText(
+                    ref,
+                    'harmonyAccountValue',
+                    '${remoteHarmonyText(ref, 'harmonyAccount', texts.harmonyAccount)}: $username',
+                    parameters: {
+                      'label': remoteHarmonyText(
+                        ref,
+                        'harmonyAccount',
+                        texts.harmonyAccount,
+                      ),
+                      'username': username,
+                    },
+                  ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: context.textTheme.bodySmall?.copyWith(
@@ -839,7 +851,9 @@ class _AccountFooter extends ConsumerWidget {
           style: TextButton.styleFrom(minimumSize: const Size(0, 48)),
           onPressed: onLogout,
           child: Text(
-            remoteHarmonyText(ref, 'harmonyLogout', texts.harmonyLogout),
+            directSubscription
+                ? texts.harmonyChangeSubscription
+                : remoteHarmonyText(ref, 'harmonyLogout', texts.harmonyLogout),
           ),
         ),
       ],

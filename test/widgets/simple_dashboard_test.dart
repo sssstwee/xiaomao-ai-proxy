@@ -23,6 +23,14 @@ class SignedOutApi extends HarmonyAccountApi {
     : super(http: Dio(BaseOptions(baseUrl: 'https://api.example.test')));
 
   int logins = 0;
+  int subscriptions = 0;
+  String? configuredUrl;
+
+  @override
+  Future<void> configureSubscription(String url) async {
+    subscriptions++;
+    configuredUrl = url;
+  }
 
   @override
   Future<HarmonySession?> restore() async => null;
@@ -194,21 +202,24 @@ void main() {
   });
 
   testWidgets(
-    'homepage title and login copy can be changed without a new screen implementation',
+    'homepage title and subscription copy can be changed without a new screen implementation',
     (tester) async {
       await tester.pumpWidget(
         scoped(
           api: SignedOutApi(),
           homeRuntime: HarmonyRemoteConfig.decodeHome({
             'schemaVersion': 1,
-            'texts': {'homeTitle': '我的 CC保镖', 'harmonyLoginHint': '登录后开启连接保护'},
+            'texts': {
+              'homeTitle': '我的 CC保镖',
+              'harmonySubscriptionHint': '从 VPS 获取连接配置',
+            },
           }),
           child: app(const SimpleDashboardView()),
         ),
       );
       await tester.pump();
       expect(find.text('我的 CC保镖'), findsOneWidget);
-      expect(find.text('登录后开启连接保护'), findsOneWidget);
+      expect(find.text('从 VPS 获取连接配置'), findsOneWidget);
       await tester.pumpWidget(const SizedBox.shrink());
     },
   );
@@ -451,43 +462,41 @@ void main() {
   });
 
   testWidgets(
-    'signed-out users must log in and cannot import or connect cached profiles',
+    'users configure one HTTPS subscription without entering credentials',
     (tester) async {
       final api = SignedOutApi();
       await renderLogin(tester, api);
       expect(find.text('CC保镖'), findsOneWidget);
-      expect(find.byType(TextFormField), findsNWidgets(2));
+      expect(find.byType(TextFormField), findsOneWidget);
       expect(find.text('导入订阅'), findsNothing);
       expect(find.text('连接'), findsNothing);
       await tester.tap(find.byType(FilledButton));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 200));
       expect(api.logins, 0);
-      expect(find.text('请填写此项。'), findsNWidgets(2));
+      expect(find.text('请输入有效的 HTTPS 订阅地址。'), findsOneWidget);
+      expect(find.text('用户名'), findsNothing);
+      expect(find.text('密码'), findsNothing);
       expect(find.byType(NavigationBar), findsNothing);
       expect(find.byType(ListTile), findsNothing);
       await tester.pumpWidget(const SizedBox.shrink());
     },
   );
 
-  testWidgets('bad credentials keep the login screen and clear the password', (
+  testWidgets('saving a subscription never invokes username/password login', (
     tester,
   ) async {
     final api = SignedOutApi();
     await renderLogin(tester, api);
-    await tester.enterText(find.byType(TextFormField).first, 'harmony');
-    await tester.enterText(find.byType(TextFormField).last, 'wrong-password');
+    await tester.enterText(
+      find.byType(TextFormField),
+      'https://vps.example.test/private/vpn.yml',
+    );
     await tester.tap(find.byType(FilledButton));
     await tester.pumpAndSettle();
-    expect(api.logins, 1);
-    expect(find.text('用户名或密码错误。'), findsOneWidget);
-    expect(
-      tester
-          .widget<EditableText>(find.byType(EditableText).last)
-          .controller
-          .text,
-      isEmpty,
-    );
+    expect(api.logins, 0);
+    expect(api.subscriptions, 1);
+    expect(api.configuredUrl, 'https://vps.example.test/private/vpn.yml');
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
@@ -598,7 +607,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('暂时无法更新订阅'), findsOneWidget);
-    expect(find.textContaining('账号服务器暂时连不上'), findsOneWidget);
+    expect(find.textContaining('暂时无法连接 VPS 订阅服务'), findsOneWidget);
     expect(find.textContaining('点上方图标连接'), findsWidgets);
     await tester.pumpWidget(const SizedBox.shrink());
   });

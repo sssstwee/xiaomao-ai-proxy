@@ -302,6 +302,24 @@ class HarmonySimple extends _$HarmonySimple {
     );
   }
 
+  Future<void> subscribe(String url) async {
+    if (state.busy || _restoring) return;
+    state = state.copyWith(busy: true, clearError: true, clearIssue: true);
+    try {
+      await _api.configureSubscription(url);
+      if (!ref.mounted) return;
+      state = state.copyWith(busy: false);
+      await bootstrap();
+    } catch (_) {
+      if (ref.mounted) {
+        state = state.copyWith(
+          busy: false,
+          error: currentAppLocalizations.harmonySubscriptionInvalid,
+        );
+      }
+    }
+  }
+
   Future<void> login(String username, String password) async {
     if (state.busy || _restoring) {
       return;

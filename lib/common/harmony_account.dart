@@ -5,6 +5,7 @@ import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
+import 'package:crypto/crypto.dart';
 import 'package:fl_clash/common/harmony_config_check.dart';
 import 'package:fl_clash/common/harmony_connect.dart';
 import 'package:fl_clash/common/harmony_remote_config.dart';
@@ -17,7 +18,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// Override the API base with CLASH_HARMONY_API_URL (see `env.json.example`).
 const harmonyApiUrl = String.fromEnvironment(
   'CLASH_HARMONY_API_URL',
-  defaultValue: 'https://cc-api.tokenforsell.com',
+  defaultValue: 'https://69.17.3.174:8444',
 );
 
 const harmonyConfigPath = '/v1/config';
@@ -42,6 +43,16 @@ class HarmonySessionStore {
   static const _reconnectKey = 'harmony_vpn_reconnect';
   static const _configRefreshKey = 'harmony_config_refresh_sec';
   static const _minCheckKey = 'harmony_config_min_check_sec';
+  static const _subscriptionUrlKey = 'harmony_subscription_url';
+
+  Future<String?> readSubscriptionUrl() =>
+      _channel.invokeMethod<String>('read', _arguments(_subscriptionUrlKey));
+
+  Future<void> writeSubscriptionUrl(String value) => _channel
+      .invokeMethod<void>('write', _arguments(_subscriptionUrlKey, value));
+
+  Future<void> deleteSubscriptionUrl() =>
+      _channel.invokeMethod<void>('delete', _arguments(_subscriptionUrlKey));
 
   Future<String?> read() =>
       _channel.invokeMethod<String>('read', _arguments(_tokenKey));
@@ -319,20 +330,60 @@ class HarmonyAccountApi {
   /// `false` after a 404 on [harmonyConfigVersionPath]; no further version probes this run.
   bool? versionEndpointSupported;
 
-  HarmonyAccountApi({Dio? http, HarmonySessionStore? storage})
-    : _http =
-          http ??
-          Dio(
-            BaseOptions(
-              baseUrl: harmonyApiUrl,
-              connectTimeout: const Duration(seconds: 15),
-              receiveTimeout: const Duration(seconds: 40),
-              followRedirects: false,
-            ),
-          ),
-      _storage = storage ?? HarmonySessionStore();
+  final bool directSubscription;
+  Uri? subscriptionUri;
 
-  bool get isAuthorized => session?.expiresAt.isAfter(DateTime.now()) == true;
+  HarmonyAccountApi({
+    Dio? http,
+    HarmonySessionStore? storage,
+    this.directSubscription = false,
+  }) : _http =
+           http ??
+           Dio(
+             BaseOptions(
+               baseUrl: harmonyApiUrl,
+               connectTimeout: const Duration(seconds: 15),
+               receiveTimeout: const Duration(seconds: 40),
+               followRedirects: false,
+             ),
+           ),
+       _storage = storage ?? HarmonySessionStore();
+
+  bool get isAuthorized =>
+      session != null &&
+      (directSubscription || session!.expiresAt.isAfter(DateTime.now()));
+
+  static Uri? parseSubscriptionUrl(String raw) {
+    final uri = Uri.tryParse(raw.trim());
+    return uri != null &&
+            uri.scheme == 'https' &&
+            uri.host.isNotEmpty &&
+            uri.userInfo.isEmpty &&
+            !uri.hasFragment
+        ? uri
+        : null;
+  }
+
+  Future<void> configureSubscription(String raw) async {
+    final uri = parseSubscriptionUrl(raw);
+    if (!directSubscription || uri == null) throw HarmonyAccountError.config;
+    await clear();
+    await _store(() => _storage.writeSubscriptionUrl(uri.toString()));
+    _restoreBlocked = false;
+  }
+
+  String _requestPath(String path) {
+    if (!directSubscription) return path;
+    final uri = subscriptionUri;
+    if (uri == null) throw HarmonyAccountError.unavailable;
+    return switch (path) {
+      harmonyConfigPath => uri.toString(),
+      harmonyConfigVersionPath =>
+        uri.replace(path: '${uri.path}/version').toString(),
+      harmonyHomeDisplayPath => uri.resolve('home.json').toString(),
+      _ => throw HarmonyAccountError.config,
+    };
+  }
 
   Future<String?> readHomeDisplayCache() async =>
       (await SharedPreferences.getInstance()).getString(_homeDisplayCacheKey);
@@ -493,6 +544,24 @@ class HarmonyAccountApi {
       return null;
     }
     final generation = _generation;
+    if (directSubscription) {
+      final raw = await _store(_storage.readSubscriptionUrl);
+      _checkGeneration(generation);
+      final uri = raw == null ? null : parseSubscriptionUrl(raw);
+      if (uri == null) {
+        subscriptionUri = null;
+        return session = null;
+      }
+      subscriptionUri = uri;
+      _http.options.baseUrl = uri.origin;
+      final source = 'vps:${sha256.convert(utf8.encode(uri.toString()))}';
+      // Local cache ownership only. This value is never sent as authorization.
+      return session = HarmonySession(
+        source,
+        source,
+        DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
+      );
+    }
     String? token;
     try {
       token = await _store(_storage.read);
@@ -542,6 +611,7 @@ class HarmonyAccountApi {
   }
 
   Future<HarmonySession> login(String username, String password) async {
+    if (directSubscription) throw HarmonyAccountError.config;
     final generation = ++_generation;
     _restoreBlocked = true;
     session = null;
@@ -802,7 +872,7 @@ class HarmonyAccountApi {
       storageFailure = error;
       storageStackTrace = stackTrace;
     }
-    if (token != null) {
+    if (token != null && !directSubscription) {
       try {
         await _request(
           '/api/auth/sign-out',
@@ -825,8 +895,12 @@ class HarmonyAccountApi {
     // subsequent successful explicit login lifts this barrier.
     _restoreBlocked = true;
     session = null;
+    subscriptionUri = null;
     versionEndpointSupported = null;
-    return _store(_storage.clearAll);
+    return _store(() async {
+      await _storage.clearAll();
+      if (directSubscription) await _storage.deleteSubscriptionUrl();
+    });
   }
 
   Future<Response<dynamic>> _request(
@@ -850,10 +924,10 @@ class HarmonyAccountApi {
         path == harmonyConfigPath || path == harmonyConfigVersionPath;
     try {
       return await _requestWithRouteFallback(
-        path,
+        _requestPath(path),
         method: method,
         data: data,
-        token: token,
+        token: directSubscription ? null : token,
         login: login,
         responseType: responseType,
         headers: headers,
@@ -868,6 +942,7 @@ class HarmonyAccountApi {
       // Config GET callers retry the entire transfer, including stream reads.
       if (configPath && _isRetryableTransportError(error)) rethrow;
       if (status == 401 || status == 403) {
+        if (directSubscription) throw HarmonyAccountError.config;
         throw login
             ? HarmonyAccountError.credentials
             : HarmonyAccountError.expired;
@@ -996,8 +1071,8 @@ class HarmonyAccountApi {
           validateStatus: (status) =>
               status != null &&
               (status >= 200 && status < 300 ||
-                  (path == harmonyConfigPath ||
-                          path == harmonyHomeDisplayPath) &&
+                  (path == _requestPath(harmonyConfigPath) ||
+                          path == _requestPath(harmonyHomeDisplayPath)) &&
                       status == 304),
           headers: {
             if (token != null) 'Authorization': 'Bearer $token',
@@ -1012,4 +1087,4 @@ class HarmonyAccountApi {
   }
 }
 
-final harmonyAccount = HarmonyAccountApi();
+final harmonyAccount = HarmonyAccountApi(directSubscription: true);

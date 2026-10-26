@@ -107,6 +107,12 @@ class HarmonyRemoteConfig {
     'simpleErrorState',
     'simpleReady',
     'simpleRunning',
+    'harmonySubscription',
+    'harmonySubscriptionHint',
+    'harmonySubscriptionUrl',
+    'harmonySubscriptionInvalid',
+    'harmonyUseSubscription',
+    'harmonyChangeSubscription',
   };
   static const homeSections = [
     'announcement',

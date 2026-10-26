@@ -453,6 +453,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "harmonyAutomaticHint": MessageLookupByLibrary.simpleMessage(
       "Domestic and local networks connect directly. Overseas networks use the proxy automatically.",
     ),
+    "harmonyChangeSubscription": MessageLookupByLibrary.simpleMessage(
+      "Change subscription",
+    ),
     "harmonyConfigCheckReasonOffline": MessageLookupByLibrary.simpleMessage(
       "Network unavailable",
     ),
@@ -535,16 +538,16 @@ class MessageLookup extends MessageLookupByLibrary {
       "None of the saved nodes responded. Tap the icon above to reconnect later or wait for a config refresh.",
     ),
     "harmonyIssueDetailOfflineCached": MessageLookupByLibrary.simpleMessage(
-      "The account server is unreachable; using your last saved profile. Tap the icon above to connect; we will refresh when the network is back.",
+      "The VPS subscription is unreachable; using saved routes. You can connect now and refresh when the network recovers.",
     ),
     "harmonyIssueDetailRateLimit": MessageLookupByLibrary.simpleMessage(
-      "Please wait about a minute before signing in or connecting again.",
+      "Please wait about a minute before refreshing the subscription or connecting again.",
     ),
     "harmonyIssueDetailService": MessageLookupByLibrary.simpleMessage(
-      "Cannot reach the account server. Check your network; with a cached profile, you can still tap the icon above to connect.",
+      "Cannot reach the VPS subscription service. Check your network or try connecting with cached routes.",
     ),
     "harmonyIssueDetailSubscription": MessageLookupByLibrary.simpleMessage(
-      "You are signed in, but connection settings are not ready. Tap the icon above to retry. Cached settings can still be used if available.",
+      "The route configuration is not ready. Tap the icon above to retry, or connect with cached routes.",
     ),
     "harmonyIssueDetailVpnFailed": MessageLookupByLibrary.simpleMessage(
       "The system VPN failed to start. Allow the VPN permission, then tap the icon above to reconnect.",
@@ -616,8 +619,23 @@ class MessageLookup extends MessageLookupByLibrary {
     "harmonyStatusSection": MessageLookupByLibrary.simpleMessage(
       "Connection details",
     ),
+    "harmonySubscription": MessageLookupByLibrary.simpleMessage(
+      "VPS subscription",
+    ),
+    "harmonySubscriptionHint": MessageLookupByLibrary.simpleMessage(
+      "Paste the HTTPS subscription URL provided by your VPS to get started.",
+    ),
+    "harmonySubscriptionInvalid": MessageLookupByLibrary.simpleMessage(
+      "Enter a valid HTTPS subscription URL.",
+    ),
+    "harmonySubscriptionUrl": MessageLookupByLibrary.simpleMessage(
+      "Subscription URL",
+    ),
     "harmonySwitchNode": MessageLookupByLibrary.simpleMessage("Switch node"),
     "harmonyUpload": MessageLookupByLibrary.simpleMessage("Upload"),
+    "harmonyUseSubscription": MessageLookupByLibrary.simpleMessage(
+      "Save subscription",
+    ),
     "harmonyUsername": MessageLookupByLibrary.simpleMessage("Username"),
     "hasCacheChange": MessageLookupByLibrary.simpleMessage(
       "Do you want to cache the changes?",

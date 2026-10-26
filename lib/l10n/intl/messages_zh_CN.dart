@@ -321,6 +321,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "harmonyAutomaticHint": MessageLookupByLibrary.simpleMessage(
       "国内和内网直连，国外网络自动使用代理。",
     ),
+    "harmonyChangeSubscription": MessageLookupByLibrary.simpleMessage("更换订阅"),
     "harmonyConfigCheckReasonOffline": MessageLookupByLibrary.simpleMessage(
       "网络不可用",
     ),
@@ -395,16 +396,16 @@ class MessageLookup extends MessageLookupByLibrary {
       "当前保存的线路都连不通。请稍后点上方图标重试连接，或等服务恢复后自动更新。",
     ),
     "harmonyIssueDetailOfflineCached": MessageLookupByLibrary.simpleMessage(
-      "账号服务器暂时连不上，正在使用上次保存的线路。可先点上方图标连接；网络恢复后会自动更新配置。",
+      "暂时无法连接 VPS 订阅服务，正在使用上次保存的线路。可先点上方图标连接；网络恢复后会自动更新配置。",
     ),
     "harmonyIssueDetailRateLimit": MessageLookupByLibrary.simpleMessage(
-      "请等待约一分钟后再试登录或连接。",
+      "请等待约一分钟后再试刷新订阅或连接。",
     ),
     "harmonyIssueDetailService": MessageLookupByLibrary.simpleMessage(
-      "无法连接账号服务器。请检查网络；若已有缓存配置，仍可点上方图标尝试连接。",
+      "无法连接 VPS 订阅服务。请检查网络；若已有缓存配置，仍可点上方图标尝试连接。",
     ),
     "harmonyIssueDetailSubscription": MessageLookupByLibrary.simpleMessage(
-      "登录已成功，但线路配置尚未准备好。请点上方图标重试。若有缓存配置，仍可尝试连接。",
+      "线路配置尚未准备好。请点上方图标重试。若有缓存配置，仍可先连接。",
     ),
     "harmonyIssueDetailVpnFailed": MessageLookupByLibrary.simpleMessage(
       "系统 VPN 没有成功启动。请确认已允许 VPN 权限，然后点上方图标重新连接。",
@@ -458,8 +459,17 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "harmonySessionTraffic": MessageLookupByLibrary.simpleMessage("本次流量"),
     "harmonyStatusSection": MessageLookupByLibrary.simpleMessage("连接说明"),
+    "harmonySubscription": MessageLookupByLibrary.simpleMessage("VPS 订阅"),
+    "harmonySubscriptionHint": MessageLookupByLibrary.simpleMessage(
+      "粘贴 VPS 提供的 HTTPS 订阅地址，即可连接。",
+    ),
+    "harmonySubscriptionInvalid": MessageLookupByLibrary.simpleMessage(
+      "请输入有效的 HTTPS 订阅地址。",
+    ),
+    "harmonySubscriptionUrl": MessageLookupByLibrary.simpleMessage("订阅地址"),
     "harmonySwitchNode": MessageLookupByLibrary.simpleMessage("切换节点"),
     "harmonyUpload": MessageLookupByLibrary.simpleMessage("上传"),
+    "harmonyUseSubscription": MessageLookupByLibrary.simpleMessage("保存订阅"),
     "harmonyUsername": MessageLookupByLibrary.simpleMessage("用户名"),
     "hasCacheChange": MessageLookupByLibrary.simpleMessage("是否缓存修改"),
     "hideFromList": MessageLookupByLibrary.simpleMessage("从列表中隐藏"),
