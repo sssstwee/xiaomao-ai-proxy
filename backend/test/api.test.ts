@@ -97,9 +97,20 @@ test('login includes only the created session expiry and retains signed bearer a
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username: 'harmony', password: 'wrong-password' }),
   });
-  expect(invalid.status).toBe(200);
-  expect(invalid.headers.get('set-auth-token')).toBeTruthy();
-  expect(await invalid.json()).toHaveProperty('session');
+  expect(invalid.status).toBe(401);
+  expect(invalid.headers.get('set-auth-token')).toBeNull();
+  expect(await invalid.json()).not.toHaveProperty('session');
+});
+
+test('an unknown username cannot log in as the existing account', async () => {
+  const response = await request('/api/auth/sign-in/username', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: 'unknown_user', password }),
+  });
+  expect(response.status).toBe(401);
+  expect(response.headers.get('set-auth-token')).toBeNull();
+  expect(await response.json()).not.toHaveProperty('session');
+  expect(await env.DB.prepare('SELECT COUNT(*) AS count FROM session').first('count')).toBe(0);
 });
 
 test('expired and tampered signed tokens cannot download settings', async () => {
@@ -134,16 +145,17 @@ test('VPS push, storage and authenticated download preserve the exact source con
   expect(unchanged.status).toBe(304);
 });
 
-test('temporary bypass accepts arbitrary credentials without shared-IP throttling', async () => {
+test('wrong passwords fail and repeated attempts are throttled in D1', async () => {
   const statuses: number[] = [];
   for (let attempt = 0; attempt < 6; attempt++) {
     const response = await request('/api/auth/sign-in/username', {
       method: 'POST', headers: { 'Content-Type': 'application/json', 'cf-connecting-ip': '192.0.2.2' },
-      body: JSON.stringify({ username: 'junk-user', password: 'incorrect-password' }),
+      body: JSON.stringify({ username: 'harmony', password: 'incorrect-password' }),
     });
     statuses.push(response.status); await response.text();
   }
-  expect(statuses).toEqual([200, 200, 200, 200, 200, 200]);
+  expect(statuses.slice(0, 5)).toEqual([401, 401, 401, 401, 401]);
+  expect(statuses[5]).toBe(429);
 });
 
 test('missing settings return a retryable error and oversized auth input is refused', async () => {
@@ -200,7 +212,7 @@ test.each([
   expect(counter?.request_count).toBe(30);
 });
 
-test('bypassed usernames share the existing account configuration limit', async () => {
+test('exhausting one user limit does not throttle another user', async () => {
   const token = await login();
   const date = new Date().toISOString();
   await env.DB.batch([
@@ -211,7 +223,7 @@ test('bypassed usernames share the existing account configuration limit', async 
   const otherToken = await login('other');
   await seedDefaultConfig();
   expect((await request('/v1/config', { headers: bearer(token) })).status).toBe(429);
-  expect((await request('/v1/config', { headers: bearer(otherToken) })).status).toBe(429);
+  expect((await request('/v1/config', { headers: bearer(otherToken) })).status).toBe(200);
 });
 
 test('returns 304 only for a matching representation ETag', async () => {

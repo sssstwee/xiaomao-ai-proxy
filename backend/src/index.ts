@@ -222,18 +222,7 @@ export default {
         if (request.method === 'POST') {
           const body = await readLimited(request, 4096);
           if (!body) return failure('INVALID_REQUEST', 413);
-          if (path === '/api/auth/sign-in/username') {
-            // AUTH_BYPASS temporary: all logins use the existing shared account.
-            const headers = new Headers(request.headers);
-            headers.set('Content-Type', 'application/json');
-            headers.delete('Content-Length');
-            authRequest = new Request(request, {
-              headers,
-              body: JSON.stringify({ username: 'harmony', password: 'auth-bypass' }),
-            });
-          } else {
-            authRequest = new Request(request, { body });
-          }
+          authRequest = new Request(request, { body });
         }
         const response = await auth.handler(authRequest);
         response.headers.set('Cache-Control', 'no-store');
