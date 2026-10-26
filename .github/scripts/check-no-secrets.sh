@@ -79,7 +79,19 @@ try:
             reasons.append('private configuration file must not be tracked')
         if b'tokenforsell' in content.lower():
             reasons.append('known leaked hostname fragment')
-        if host.search(content):
+        # This public client endpoint is intentionally shipped in the app.
+        public_api_paths = {
+            'lib/common/harmony_account.dart',
+            'env.json.example',
+            'test/common/harmony_account_test.dart',
+        }
+        deployment_urls = host.findall(content)
+        if path in public_api_paths:
+            deployment_urls = [
+                url for url in deployment_urls
+                if url != b'https://clash-harmony-api.pages.dev'
+            ]
+        if deployment_urls:
             reasons.append('deployment-specific Workers/Pages URL')
         if name.startswith('wrangler') and name.endswith(('.json', '.jsonc', '.toml', '.json.example', '.jsonc.example', '.toml.example')):
             for match in database_id.finditer(content):
