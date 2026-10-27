@@ -15,6 +15,15 @@ class _SubscriptionStore extends HarmonySessionStore {
   Future<String?> readSubscriptionUrl() async => url;
 }
 
+class _TrustedFixtureOverride extends HttpOverrides {
+  @override
+  HttpClient createHttpClient(SecurityContext? context) {
+    final trusted = SecurityContext(withTrustedRoots: false)
+      ..setTrustedCertificatesBytes(utf8.encode(_caCertificate));
+    return super.createHttpClient(trusted);
+  }
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   late HttpServer server;
@@ -32,8 +41,16 @@ void main() {
     );
     server.listen((request) async {
       receivedPaths.add(request.uri.path);
-      request.response.headers.contentType = ContentType.json;
-      request.response.write(jsonEncode({'schemaVersion': 1}));
+      if (request.uri.path.endsWith('/version')) {
+        request.response.headers.contentType = ContentType.json;
+        request.response.write(jsonEncode({'version': 'new-version'}));
+      } else if (request.uri.path.endsWith('config.yaml')) {
+        request.response.headers.set('x-config-version', 'new-version');
+        request.response.write('proxies: []\nrules: []\n');
+      } else {
+        request.response.headers.contentType = ContentType.json;
+        request.response.write(jsonEncode({'schemaVersion': 1}));
+      }
       await request.response.close();
     }, onError: (Object error) => expect(error, isA<HandshakeException>()));
   });
@@ -77,24 +94,139 @@ void main() {
       }, FlClashHttpOverrides());
     },
   );
+
+  test(
+    'disconnected subscription uses and releases its temporary proxy',
+    () async {
+      final proxy = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(proxy.close);
+      final sockets = <Socket>[];
+      addTearDown(() {
+        for (final socket in sockets) {
+          socket.destroy();
+        }
+      });
+      var connects = 0;
+      proxy.listen((downstream) {
+        sockets.add(downstream);
+        Socket? upstream;
+        var headers = <int>[];
+        downstream.listen((bytes) async {
+          if (upstream != null) {
+            upstream!.add(bytes);
+            return;
+          }
+          headers.addAll(bytes);
+          final text = latin1.decode(headers);
+          if (!text.contains('\r\n\r\n')) return;
+          expect(text, startsWith('CONNECT '));
+          connects++;
+          upstream = await Socket.connect(
+            InternetAddress.loopbackIPv4,
+            server.port,
+          );
+          sockets.add(upstream!);
+          upstream!.listen(downstream.add, onDone: downstream.destroy);
+          downstream.write('HTTP/1.1 200 Connection Established\r\n\r\n');
+          headers = [];
+        }, onDone: () => upstream?.destroy());
+      });
+      final unused = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+      final closedPort = unused.port;
+      await unused.close();
+      var closed = 0;
+      await HttpOverrides.runWithHttpOverrides(() async {
+        final http = Dio(
+          BaseOptions(connectTimeout: const Duration(seconds: 2)),
+        );
+        addTearDown(() => http.close(force: true));
+        final api = HarmonyAccountApi(
+          http: http,
+          storage: _SubscriptionStore(
+            'https://localhost:$closedPort/subscription/config.yaml',
+          ),
+          directSubscription: true,
+        );
+        await api.restore();
+        api.openOfflineProxy = () async => HarmonySubscriptionProxyLease(
+          port: proxy.port,
+          close: () async => closed++,
+        );
+
+        final response = await api.fetchHomeDisplay();
+        final version = await api.fetchConfigVersionInfo();
+        final config = await api.downloadConfig();
+        expect(response.statusCode, HttpStatus.ok);
+        expect(version?.version, 'new-version');
+        expect(config.configVersion, 'new-version');
+        expect(utf8.decode(config.bytes!), 'proxies: []\nrules: []\n');
+        expect(connects, 3);
+        expect(receivedPaths, [
+          '/subscription/home.json',
+          '/subscription/config.yaml/version',
+          '/subscription/config.yaml',
+        ]);
+        expect(closed, 3);
+      }, _TrustedFixtureOverride());
+    },
+  );
+
+  test('an unavailable temporary proxy falls back to direct HTTPS', () async {
+    final unused = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+    final closedPort = unused.port;
+    await unused.close();
+    var closed = 0;
+    await HttpOverrides.runWithHttpOverrides(() async {
+      final http = Dio(BaseOptions(connectTimeout: const Duration(seconds: 2)));
+      addTearDown(() => http.close(force: true));
+      final api = HarmonyAccountApi(
+        http: http,
+        storage: _SubscriptionStore(
+          'https://localhost:${server.port}/subscription/config.yaml',
+        ),
+        directSubscription: true,
+      );
+      await api.restore();
+      api.openOfflineProxy = () async => HarmonySubscriptionProxyLease(
+        port: closedPort,
+        close: () async => closed++,
+      );
+      expect((await api.fetchHomeDisplay()).statusCode, HttpStatus.ok);
+      expect(receivedPaths, ['/subscription/home.json']);
+      expect(closed, 1);
+    }, _TrustedFixtureOverride());
+  });
 }
 
-// Self-signed loopback-only test fixture, valid 2020-2120. This key was generated
+// Loopback-only test fixture, signed by a test root and valid 2015-2120. This key was generated
 // for these tests and is never used by an application or deployment.
 const _certificate = '''-----BEGIN CERTIFICATE-----
-MIIBXTCCAQKgAwIBAgIBATAKBggqhkjOPQQDAjAeMRwwGgYDVQQDDBNsb2NhbGhv
-c3QgdGVzdCBvbmx5MCAXDTIwMDEwMTAwMDAwMFoYDzIxMjAwMTAxMDAwMDAwWjAe
-MRwwGgYDVQQDDBNsb2NhbGhvc3QgdGVzdCBvbmx5MFkwEwYHKoZIzj0CAQYIKoZI
-zj0DAQcDQgAE8KRRueF79E5394r5P7hY5FFFLmsuCl8uEyNSiTHs2Mis8/6rSzHJ
-KgVo9VGn5Lmp/tx0xswV5Ju3bH4uVT7SNaMvMC0wGgYDVR0RBBMwEYIJbG9jYWxo
-b3N0hwR/AAABMA8GA1UdEwEB/wQFMAMBAf8wCgYIKoZIzj0EAwIDSQAwRgIhANDg
-QpkSLZlJMcCANJHGkgLwpNa6Go7TqTdZY/w7tZ41AiEA4yf8X58/+hvgedKIzp4x
-vn/O44/P/51VuhG+wc7aYuE=
+MIIBiDCCAS6gAwIBAgIUIJStk9D9s78x4pMkEmTYhCdhvYswCgYIKoZIzj0EAwIw
+HzEdMBsGA1UEAwwUTG9jYWwgdGVzdCByb290IG9ubHkwIBcNMTUwMTAxMDAwMDAw
+WhgPMjEyMDAxMDEwMDAwMDBaMBQxEjAQBgNVBAMMCWxvY2FsaG9zdDBZMBMGByqG
+SM49AgEGCCqGSM49AwEHA0IABBhkkUBPlEFKRjICN4Tzi1FGgJE2aIK4z7XoTDJZ
+/PxjTz9dC1u7C6uSwY3PQi2FwJpLj1thpfYlUwf/w7xH9x2jUTBPMAwGA1UdEwEB
+/wQCMAAwGgYDVR0RBBMwEYIJbG9jYWxob3N0hwR/AAABMBMGA1UdJQQMMAoGCCsG
+AQUFBwMBMA4GA1UdDwEB/wQEAwIFoDAKBggqhkjOPQQDAgNIADBFAiEAz9zzEbP5
+hbVKlEkKm9adwZ8QXSEhiw340LHGHm3uERQCICoWIypPwvsKN4cKl0RhBfi+Hg/W
+BBufp2ZI8h0/x0Gq
 -----END CERTIFICATE-----
 ''';
 const _privateKey = '''-----BEGIN PRIVATE KEY-----
-MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQge522zjCzPvzC/jX1
-FHEBqRGeRhAJSxmF93CAPKKH6pGhRANCAATwpFG54Xv0Tnf3ivk/uFjkUUUuay4K
-Xy4TI1KJMezYyKzz/qtLMckqBWj1Uafkuan+3HTGzBXkm7dsfi5VPtI1
+MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgIM4/k7uMfLFJilP0
+cUwziCVHlHizuNllIQqP1V+WFdehRANCAAQYZJFAT5RBSkYyAjeE84tRRoCRNmiC
+uM+16EwyWfz8Y08/XQtbuwurksGNz0IthcCaS49bYaX2JVMH/8O8R/cd
 -----END PRIVATE KEY-----
+''';
+
+const _caCertificate = '''-----BEGIN CERTIFICATE-----
+MIIBaDCCAQ6gAwIBAgIUGZjfOvxOC2oG9Vj70E/UUj8sxlowCgYIKoZIzj0EAwIw
+HzEdMBsGA1UEAwwUTG9jYWwgdGVzdCByb290IG9ubHkwIBcNMTUwMTAxMDAwMDAw
+WhgPMjEyMDAxMDEwMDAwMDBaMB8xHTAbBgNVBAMMFExvY2FsIHRlc3Qgcm9vdCBv
+bmx5MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEna+d4FzBbNMw2hjV8RWDC4hH
+UMZ3+m7+mpo/hu4PvCD1hdc3DjlPVkp5guPy0oiJrcp5n31Pfj0Ie2BESgXCwaMm
+MCQwEgYDVR0TAQH/BAgwBgEB/wIBADAOBgNVHQ8BAf8EBAMCAYYwCgYIKoZIzj0E
+AwIDSAAwRQIhAMdZph/tKSb3I29LaqIIQ7U2iN+NKFYEYIWjLIZyog+0AiAYIcyq
+7Hxwycb39r0TuNdA2LRNiF5eAZo4EktJf20lxg==
+-----END CERTIFICATE-----
 ''';

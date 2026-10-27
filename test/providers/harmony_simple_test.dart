@@ -3,10 +3,12 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
+import 'package:fake_async/fake_async.dart';
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/common/auto_proxy.dart';
 import 'package:fl_clash/common/harmony_account.dart';
 import 'package:fl_clash/common/harmony_config_check.dart';
+import 'package:fl_clash/common/harmony_config_freshness.dart';
 import 'package:fl_clash/common/harmony_user_issue.dart';
 import 'package:fl_clash/core/controller.dart';
 import 'package:fl_clash/enum/enum.dart';
@@ -65,8 +67,13 @@ class _Api extends HarmonyAccountApi {
   void Function()? downloadStarted;
   Future<HarmonySession?> Function()? restoreHook;
   Future<HarmonyConfigCacheMetadata?> Function()? cacheHook;
+  bool requireOfflineProxy = false;
+  bool requireOfflineProxyForVersion = false;
+  int versionChecks = 0;
+  final offlineProxyPorts = <int>[];
+  void Function()? offlineProxyOpened;
 
-  _Api(this.events) {
+  _Api(this.events, {super.directSubscription = false}) {
     session = _session();
   }
 
@@ -105,17 +112,28 @@ class _Api extends HarmonyAccountApi {
     requests.add((etag: ifNoneMatch, lastModified: ifModifiedSince));
     events.add('download');
     downloadStarted?.call();
-    if (downloads.isEmpty) {
-      throw StateError('Unexpected config request');
+    HarmonySubscriptionProxyLease? lease;
+    if (requireOfflineProxy) {
+      lease = await openOfflineProxy?.call();
+      if (lease == null) throw HarmonyAccountError.unavailable;
+      offlineProxyPorts.add(lease.port);
+      offlineProxyOpened?.call();
     }
-    final next = downloads.removeAt(0);
-    if (next is Future<HarmonyConfigDownload>) {
-      return next;
+    try {
+      if (downloads.isEmpty) {
+        throw StateError('Unexpected config request');
+      }
+      final next = downloads.removeAt(0);
+      if (next is Future<HarmonyConfigDownload>) {
+        return await next;
+      }
+      if (next is HarmonyConfigDownload) {
+        return next;
+      }
+      throw next;
+    } finally {
+      await lease?.close();
     }
-    if (next is HarmonyConfigDownload) {
-      return next;
-    }
-    throw next;
   }
 
   @override
@@ -151,8 +169,19 @@ class _Api extends HarmonyAccountApi {
 
   @override
   Future<HarmonyConfigVersionInfo?> fetchConfigVersionInfo() async {
-    if (versionFailure != null) throw versionFailure!;
-    return versionHook?.call();
+    versionChecks++;
+    HarmonySubscriptionProxyLease? lease;
+    if (requireOfflineProxyForVersion) {
+      lease = await openOfflineProxy?.call();
+      if (lease == null) throw HarmonyAccountError.unavailable;
+      offlineProxyPorts.add(lease.port);
+    }
+    try {
+      if (versionFailure != null) throw versionFailure!;
+      return await versionHook?.call();
+    } finally {
+      await lease?.close();
+    }
   }
 
   @override
@@ -334,6 +363,7 @@ class _Setup extends SetupAction {
   Object? stopFailure;
   int applies = 0;
   Object? applyFailure;
+  Future<void> Function()? applyHook;
   final starts = <({bool isInit, bool profileApplied})>[];
 
   _Setup(this.events);
@@ -360,6 +390,7 @@ class _Setup extends SetupAction {
   }) async {
     applies++;
     events.add('apply');
+    await applyHook?.call();
     final failure = applyFailure;
     applyFailure = null;
     if (failure != null) throw failure;
@@ -397,8 +428,9 @@ class _ProxyActions extends ProxiesAction {
 class _Controller extends Mock implements CoreController {}
 
 class _Harness {
+  final bool directSubscription;
   final events = <String>[];
-  late final api = _Api(events);
+  late final api = _Api(events, directSubscription: directSubscription);
   late final files = _Files(events);
   late final profiles = _ProfileActions(events);
   late final setup = _Setup(events);
@@ -407,7 +439,10 @@ class _Harness {
   final controller = _Controller();
   late final ProviderContainer container;
 
-  _Harness({List<Profile> initial = const []}) {
+  _Harness({
+    List<Profile> initial = const [],
+    this.directSubscription = false,
+  }) {
     container = ProviderContainer(
       overrides: [
         harmonyAccountApiProvider.overrideWithValue(api),
@@ -430,6 +465,10 @@ class _Harness {
     container.listen(groupsProvider, (_, _) {});
     container.listen(patchClashConfigProvider, (_, _) {});
     container.listen(vpnSettingProvider, (_, _) {});
+    when(() => controller.startSubscriptionProxy()).thenAnswer((_) async => 0);
+    when(
+      () => controller.stopSubscriptionProxy(any()),
+    ).thenAnswer((_) async => true);
     addTearDown(container.dispose);
   }
 
@@ -535,6 +574,200 @@ void main() {
     expect(harness.state.remoteProfile, isNull);
     expect(harness.state.bootstrapping, isFalse);
     expect(harness.state.homeStatus.configSyncInProgress, isFalse);
+  });
+
+  test(
+    'disconnected refresh uses the verified cache and closes its proxy',
+    () async {
+      final harness = _Harness(initial: [_profile()], directSubscription: true);
+      harness.cache();
+      harness.api.downloads.add(const HarmonyConfigDownload(notModified: true));
+      await harness.notifier.bootstrap();
+      harness.api.requireOfflineProxy = true;
+      final updated = Uint8List.fromList(
+        'proxies: []\nrules: [MATCH,DIRECT]'.codeUnits,
+      );
+      harness.api.downloads.add(
+        HarmonyConfigDownload(bytes: updated, configVersion: 'new-version'),
+      );
+      when(
+        () => harness.controller.startSubscriptionProxy(),
+      ).thenAnswer((_) async => 42317);
+
+      expect(await harness.notifier.forceRefreshConfig(), isTrue);
+      expect(harness.api.offlineProxyPorts, [42317]);
+      expect(harness.files.bytes[7], updated);
+      expect(harness.api.validatorWrites.last.version, 'new-version');
+      expect(harness.container.read(isStartProvider), isFalse);
+      expect(harness.setup.starts, isEmpty);
+      verify(() => harness.controller.stopSubscriptionProxy(42317)).called(1);
+    },
+  );
+
+  test('offline refresh refuses a cache with a changed file', () async {
+    final harness = _Harness(initial: [_profile()], directSubscription: true);
+    harness.cache();
+    harness.api.downloads.add(const HarmonyConfigDownload(notModified: true));
+    await harness.notifier.bootstrap();
+    harness.files.bytes[7] = Uint8List.fromList('unexpected'.codeUnits);
+    harness.api.requireOfflineProxy = true;
+
+    expect(await harness.notifier.forceRefreshConfig(), isFalse);
+    verifyNever(() => harness.controller.startSubscriptionProxy());
+    expect(harness.setup.starts, isEmpty);
+  });
+
+  test(
+    'manual refresh reports failure rather than successful cache fallback',
+    () async {
+      final harness = _Harness(initial: [_profile()]);
+      harness.cache();
+      harness.api.downloads.add(const HarmonyConfigDownload(notModified: true));
+      await harness.notifier.bootstrap();
+      harness.api.downloads.add(HarmonyAccountError.unavailable);
+
+      expect(await harness.notifier.forceRefreshConfig(), isFalse);
+      expect(harness.files.bytes[7], _config);
+      expect(
+        harness.state.homeStatus.configFreshness.kind,
+        HarmonyConfigFreshnessKind.checkFailedUsingCache,
+      );
+    },
+  );
+
+  test('VPN startup waits for superseded offline proxy preparation', () async {
+    final harness = _Harness(initial: [_profile()], directSubscription: true);
+    harness.cache();
+    harness.api.downloads.add(const HarmonyConfigDownload(notModified: true));
+    await harness.notifier.bootstrap();
+    harness.installRoute();
+    harness.api.requireOfflineProxy = true;
+    final preparationStarted = Completer<void>();
+    final releasePreparation = Completer<void>();
+    harness.setup.applyHook = () async {
+      if (!preparationStarted.isCompleted) {
+        preparationStarted.complete();
+        await releasePreparation.future;
+      }
+    };
+    final refresh = harness.notifier.forceRefreshConfig();
+    await preparationStarted.future;
+    final connect = harness.notifier.toggleConnect();
+    expect(harness.setup.starts, isEmpty);
+    releasePreparation.complete();
+    expect(await refresh, isFalse);
+    await connect;
+    verifyNever(() => harness.controller.startSubscriptionProxy());
+    expect(harness.setup.starts, hasLength(1));
+  });
+
+  test('a failed offline preparation does not block VPN startup', () async {
+    final harness = _Harness(initial: [_profile()], directSubscription: true);
+    harness.cache();
+    harness.api.downloads.add(const HarmonyConfigDownload(notModified: true));
+    await harness.notifier.bootstrap();
+    harness.installRoute();
+    harness.api.requireOfflineProxy = true;
+    final preparationStarted = Completer<void>();
+    final releasePreparation = Completer<void>();
+    harness.setup.applyHook = () async {
+      if (!preparationStarted.isCompleted) {
+        preparationStarted.complete();
+        await releasePreparation.future;
+        throw StateError('temporary preparation failed');
+      }
+    };
+    final refresh = harness.notifier.forceRefreshConfig();
+    await preparationStarted.future;
+    final connect = harness.notifier.toggleConnect();
+    releasePreparation.complete();
+    expect(await refresh, isFalse);
+    await connect;
+    verifyNever(() => harness.controller.startSubscriptionProxy());
+    expect(harness.setup.starts, hasLength(1));
+  });
+
+  test('logout closes a pending offline subscription proxy', () async {
+    final harness = _Harness(initial: [_profile()], directSubscription: true);
+    harness.cache();
+    harness.api.downloads.add(const HarmonyConfigDownload(notModified: true));
+    await harness.notifier.bootstrap();
+    harness.api.requireOfflineProxy = true;
+    final opened = Completer<void>();
+    final download = Completer<HarmonyConfigDownload>();
+    harness.api.offlineProxyOpened = opened.complete;
+    harness.api.downloads.add(download.future);
+    when(
+      () => harness.controller.startSubscriptionProxy(),
+    ).thenAnswer((_) async => 42317);
+
+    final refresh = harness.notifier.forceRefreshConfig();
+    await opened.future;
+    await harness.notifier.logout();
+    download.complete(HarmonyConfigDownload(bytes: _config));
+    expect(await refresh, isFalse);
+    verify(() => harness.controller.stopSubscriptionProxy(42317)).called(1);
+    expect(harness.state.session, isNull);
+    expect(harness.state.remoteProfile, isNull);
+  });
+
+  test('a new version is downloaded while the VPN is disconnected', () async {
+    final harness = _Harness(initial: [_profile()], directSubscription: true);
+    harness.cache();
+    harness.api.downloads.add(const HarmonyConfigDownload(notModified: true));
+    final initialProbe = Completer<void>();
+    harness.api.versionHook = () async {
+      if (!initialProbe.isCompleted) initialProbe.complete();
+      return null;
+    };
+    await harness.notifier.bootstrap();
+    await initialProbe.future;
+    await Future<void>.delayed(Duration.zero);
+    final updated = Uint8List.fromList(
+      'proxies: []\nrules: [MATCH,DIRECT]'.codeUnits,
+    );
+    harness.api.requireOfflineProxy = true;
+    harness.api.requireOfflineProxyForVersion = true;
+    harness.api.versionHook = () async => const HarmonyConfigVersionInfo(
+      version: 'new-version',
+      minCheckInterval: Duration(minutes: 5),
+    );
+    harness.api.downloads.add(
+      HarmonyConfigDownload(bytes: updated, configVersion: 'new-version'),
+    );
+    when(
+      () => harness.controller.startSubscriptionProxy(),
+    ).thenAnswer((_) async => 42317);
+
+    await harness.notifier.checkConfigVersion(force: true);
+    expect(harness.files.bytes[7], updated);
+    expect(harness.api.validatorWrites.last.version, 'new-version');
+    expect(harness.api.offlineProxyPorts, [42317, 42317]);
+    verify(() => harness.controller.stopSubscriptionProxy(42317)).called(2);
+    expect(harness.container.read(isStartProvider), isFalse);
+    expect(harness.setup.starts, isEmpty);
+  });
+
+  test('disconnect keeps the periodic subscription check active', () {
+    fakeAsync((time) {
+      final harness = _Harness(initial: [_profile()]);
+      harness.cache();
+      harness.api.downloads.add(const HarmonyConfigDownload(notModified: true));
+      harness.notifier.bootstrap();
+      time.flushMicrotasks();
+      harness.installRoute();
+      harness.notifier.toggleConnect();
+      time.flushMicrotasks();
+      expect(harness.container.read(isStartProvider), isTrue);
+      harness.notifier.toggleConnect();
+      time.flushMicrotasks();
+      expect(harness.container.read(isStartProvider), isFalse);
+      final checksAtDisconnect = harness.api.versionChecks;
+
+      time.elapse(const Duration(hours: 24));
+      time.flushMicrotasks();
+      expect(harness.api.versionChecks, greaterThan(checksAtDisconnect));
+    });
   });
 
   test('local import prepares a versioned cache without downloading', () async {

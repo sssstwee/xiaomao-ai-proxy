@@ -151,7 +151,7 @@ jobs:
         working-directory: core
         env:
           CGO_ENABLED: '0'
-        run: go test -mod=mod -run TestDelayHonorsConfiguredHTTPStatus -count=1 .
+        run: go test -mod=mod -run 'Test(DelayHonorsConfiguredHTTPStatus|SubscriptionProxy)' -count=1 .
 
       - name: Set up HarmonyOS Go
         if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'

@@ -38,6 +38,10 @@ mixin CoreInterface {
 
   Future<bool> stopListener();
 
+  Future<int> startSubscriptionProxy();
+
+  Future<bool> stopSubscriptionProxy(int port);
+
   Future<String> getExternalProviders();
 
   Future<String>? getExternalProvider(String externalProviderName);
@@ -318,6 +322,20 @@ abstract class CoreHandlerInterface with CoreInterface {
   @override
   Future<bool> stopListener() async {
     return await _invoke<bool>(method: ActionMethod.stopListener) ?? false;
+  }
+
+  @override
+  Future<int> startSubscriptionProxy() async {
+    return await _invoke<int>(method: ActionMethod.startSubscriptionProxy) ?? 0;
+  }
+
+  @override
+  Future<bool> stopSubscriptionProxy(int port) async {
+    return await _invoke<bool>(
+          method: ActionMethod.stopSubscriptionProxy,
+          data: port,
+        ) ??
+        false;
   }
 
   @override

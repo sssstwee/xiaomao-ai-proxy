@@ -203,6 +203,11 @@ class CoreController {
     return _interface.stopListener();
   }
 
+  Future<int> startSubscriptionProxy() => _interface.startSubscriptionProxy();
+
+  Future<bool> stopSubscriptionProxy(int port) =>
+      _interface.stopSubscriptionProxy(port);
+
   Future<Delay> getDelay(
     String url,
     String proxyName, {

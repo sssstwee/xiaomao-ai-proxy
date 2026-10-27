@@ -250,6 +250,8 @@ enum ActionMethod {
   stopLog,
   startListener,
   stopListener,
+  startSubscriptionProxy,
+  stopSubscriptionProxy,
   getCountryCode,
   getMemory,
   crash,
