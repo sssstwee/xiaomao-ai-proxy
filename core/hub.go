@@ -80,6 +80,9 @@ func handleForceGC() {
 }
 
 func handleShutdown() bool {
+	runLock.Lock()
+	defer runLock.Unlock()
+	closeSubscriptionProxies()
 	stopListeners()
 	executor.Shutdown()
 	handleForceGC()

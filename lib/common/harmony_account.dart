@@ -315,6 +315,16 @@ class HarmonyConfigDownload {
   });
 }
 
+class HarmonySubscriptionProxyLease {
+  final int port;
+  final Future<void> Function() close;
+
+  const HarmonySubscriptionProxyLease({
+    required this.port,
+    required this.close,
+  });
+}
+
 class HarmonyAccountApi {
   static const _homeDisplayCacheKey = 'harmony_home_display';
   final Dio _http;
@@ -326,6 +336,9 @@ class HarmonyAccountApi {
 
   /// When set (VPN running), config fetches retry via local mixed port after a direct failure.
   int? localMixedProxyPort;
+
+  /// Opens a short-lived local proxy using a verified cached configuration.
+  Future<HarmonySubscriptionProxyLease?> Function()? openOfflineProxy;
 
   /// `false` after a 404 on [harmonyConfigVersionPath]; no further version probes this run.
   bool? versionEndpointSupported;
@@ -966,32 +979,55 @@ class HarmonyAccountApi {
     Map<String, String>? headers,
     required bool allowProxyFallback,
   }) async {
+    HarmonySubscriptionProxyLease? temporary;
     try {
-      return await _dioRequest(
-        path: path,
-        method: method,
-        data: data,
-        token: token,
-        responseType: responseType,
-        headers: headers,
-        viaLocalProxy: false,
-      );
-    } on DioException catch (error) {
-      if (!allowProxyFallback ||
-          localMixedProxyPort == null ||
-          !_isRetryableTransportError(error)) {
-        rethrow;
+      if (allowProxyFallback && localMixedProxyPort == null) {
+        temporary = await openOfflineProxy?.call();
       }
+      if (temporary != null) {
+        try {
+          return await _dioRequest(
+            path: path,
+            method: method,
+            data: data,
+            token: token,
+            responseType: responseType,
+            headers: headers,
+            proxyPort: temporary.port,
+          );
+        } on DioException catch (error) {
+          if (!_isRetryableTransportError(error)) rethrow;
+        }
+      }
+      try {
+        return await _dioRequest(
+          path: path,
+          method: method,
+          data: data,
+          token: token,
+          responseType: responseType,
+          headers: headers,
+        );
+      } on DioException catch (error) {
+        final port = localMixedProxyPort;
+        if (!allowProxyFallback ||
+            port == null ||
+            !_isRetryableTransportError(error)) {
+          rethrow;
+        }
+        return _dioRequest(
+          path: path,
+          method: method,
+          data: data,
+          token: token,
+          responseType: responseType,
+          headers: headers,
+          proxyPort: port,
+        );
+      }
+    } finally {
+      await temporary?.close();
     }
-    return _dioRequest(
-      path: path,
-      method: method,
-      data: data,
-      token: token,
-      responseType: responseType,
-      headers: headers,
-      viaLocalProxy: true,
-    );
   }
 
   Future<Response<dynamic>> _dioRequest({
@@ -1001,7 +1037,7 @@ class HarmonyAccountApi {
     String? token,
     required ResponseType responseType,
     Map<String, String>? headers,
-    required bool viaLocalProxy,
+    int? proxyPort,
   }) async {
     final options = Options(
       method: method,
@@ -1023,7 +1059,7 @@ class HarmonyAccountApi {
       token: token,
       responseType: responseType,
       headers: headers,
-      viaLocalProxy: viaLocalProxy,
+      proxyPort: proxyPort,
     );
   }
 
@@ -1042,9 +1078,8 @@ class HarmonyAccountApi {
     String? token,
     required ResponseType responseType,
     Map<String, String>? headers,
-    required bool viaLocalProxy,
+    int? proxyPort,
   }) async {
-    final port = localMixedProxyPort;
     // An old config retry can overlap logout/login or a session check. Keep its
     // route on its own Dio instance instead of replacing a shared adapter.
     final http = _http.clone(
@@ -1054,8 +1089,8 @@ class HarmonyAccountApi {
           // Subscription responses carry proxy credentials. Do not inherit the
           // application's permissive certificate callback for these requests.
           client.badCertificateCallback = null;
-          if (viaLocalProxy && port != null) {
-            client.findProxy = (_) => 'PROXY localhost:$port';
+          if (proxyPort != null) {
+            client.findProxy = (_) => 'PROXY localhost:$proxyPort';
           } else {
             client.findProxy = (_) => 'DIRECT';
           }

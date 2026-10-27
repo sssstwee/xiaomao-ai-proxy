@@ -169,6 +169,17 @@ func handleAction(action *Action, result ActionResult) {
 	case stopListenerMethod:
 		result.success(handleStopListener())
 		return
+	case startSubscriptionProxyMethod:
+		result.success(handleStartSubscriptionProxy())
+		return
+	case stopSubscriptionProxyMethod:
+		port, ok := action.Data.(float64)
+		if !ok {
+			result.error("invalid subscription proxy port")
+			return
+		}
+		result.success(handleStopSubscriptionProxy(int(port)))
+		return
 	case getCountryCodeMethod:
 		ip := action.Data.(string)
 		handleGetCountryCode(ip, func(value string) {

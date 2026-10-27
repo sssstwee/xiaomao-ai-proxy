@@ -126,6 +126,7 @@ class HarmonySimple extends _$HarmonySimple {
   int _operation = 0;
   int _configSyncGeneration = 0;
   bool _restoring = false;
+  Future<void>? _offlineProxyPreparation;
   final _profileInstalls = <({Profile profile, Completer<void> done})>[];
 
   void _ensureCurrent(int operation, String token) {
@@ -500,8 +501,20 @@ class HarmonySimple extends _$HarmonySimple {
         );
         _stopBackgroundTasks();
         await setup.updateStatus(false);
+        _ensureCurrent(operation, token);
+        _scheduleConfigRefresh();
+        _scheduleVersionCheck();
         return;
       }
+      final preparation = _offlineProxyPreparation;
+      if (preparation != null) {
+        try {
+          await preparation;
+        } catch (_) {
+          // A failed or superseded temporary proxy must not block VPN startup.
+        }
+      }
+      _ensureCurrent(operation, token);
       await _connectVpn(operation: operation, token: token);
     } on _SupersededHarmonyOperation {
       // Do not let an old probe/connect completion revive a signed-out session.
@@ -595,7 +608,11 @@ class HarmonySimple extends _$HarmonySimple {
   Future<bool> forceRefreshConfig({
     Map<String, String> messages = const {},
   }) async {
-    if (_api.session == null || state.busy) return false;
+    if (_api.session == null ||
+        state.busy ||
+        state.homeStatus.configSyncInProgress) {
+      return false;
+    }
     final now = DateTime.now();
     if (_manualRefreshInFlight) return false;
     if (_lastManualRefreshAt != null &&
@@ -614,7 +631,7 @@ class HarmonySimple extends _$HarmonySimple {
     var ok = false;
     try {
       await _syncRemoteProfile(
-        fallbackOnNetworkError: true,
+        fallbackOnNetworkError: false,
         skipConditionals: true,
         hotApplyWhenConnected: true,
         manualRefresh: true,
@@ -684,13 +701,12 @@ class HarmonySimple extends _$HarmonySimple {
         needsDownload = !await _api.probeConfigNotModified();
       }
       _ensureCurrent(operation, token);
+      // A manual or bootstrap refresh already owns installation of the profile.
+      if (_manualRefreshInFlight || state.homeStatus.configSyncInProgress) {
+        return;
+      }
       _versionCheckFailures = 0;
       _lastVersionCheckAt = DateTime.now();
-      await _markConfigUpToDate(
-        operation: operation,
-        checkedAt: _lastVersionCheckAt,
-      );
-      _ensureCurrent(operation, token);
       if (needsDownload) {
         _setConfigFreshness(
           state.homeStatus.configFreshness.copyWith(
@@ -702,6 +718,11 @@ class HarmonySimple extends _$HarmonySimple {
           fallbackOnNetworkError: true,
           hotApplyWhenConnected: true,
           operation: operation,
+        );
+      } else {
+        await _markConfigUpToDate(
+          operation: operation,
+          checkedAt: _lastVersionCheckAt,
         );
       }
     } on _SupersededHarmonyOperation {
@@ -734,10 +755,89 @@ class HarmonySimple extends _$HarmonySimple {
   }
 
   void _bindConfigFetchRoute() {
+    _api.openOfflineProxy = _api.directSubscription ? _openOfflineProxy : null;
     if (ref.read(isStartProvider)) {
       _api.localMixedProxyPort = ref.read(patchClashConfigProvider).mixedPort;
     } else {
       _api.localMixedProxyPort = null;
+    }
+  }
+
+  Future<HarmonySubscriptionProxyLease?> _openOfflineProxy() async {
+    final session = _api.session;
+    if (session == null || ref.read(isStartProvider) || state.busy) return null;
+    final operation = _operation;
+    try {
+      // Do not load a profile while an installation is replacing its file.
+      for (final install in List.of(_profileInstalls)) {
+        await install.done.future;
+      }
+      _ensureCurrent(operation, session.token);
+      final cached = await _verifiedCachedProfile(await _api.readConfigCache());
+      _ensureCurrent(operation, session.token);
+      if (cached == null) return null;
+      await _prepareOfflineProxy(cached, operation, session.token);
+      _ensureCurrent(operation, session.token);
+      if (ref.read(isStartProvider) || state.busy) return null;
+      final core = ref.read(harmonyCoreControllerProvider);
+      final port = await core.startSubscriptionProxy();
+      if (port <= 0) return null;
+      try {
+        _ensureCurrent(operation, session.token);
+        return HarmonySubscriptionProxyLease(
+          port: port,
+          close: () async {
+            await core.stopSubscriptionProxy(port);
+          },
+        );
+      } catch (_) {
+        await core.stopSubscriptionProxy(port);
+        rethrow;
+      }
+    } on _SupersededHarmonyOperation {
+      rethrow;
+    } catch (error) {
+      commonPrint.log(
+        'Harmony subscription proxy unavailable (${error.runtimeType})',
+      );
+      return null;
+    }
+  }
+
+  Future<void> _prepareOfflineProxy(
+    Profile cached,
+    int operation,
+    String token,
+  ) async {
+    final existing = _offlineProxyPreparation;
+    if (existing != null) {
+      await existing;
+      return;
+    }
+    final preparation = () async {
+      if (!ref.read(initProvider)) {
+        final ready = Completer<void>();
+        final subscription = ref.listen(initProvider, (_, initialized) {
+          if (initialized && !ready.isCompleted) ready.complete();
+        });
+        await ready.future.whenComplete(subscription.close);
+        _ensureCurrent(operation, token);
+      }
+      await ref.read(coreActionProvider.notifier).tryStartCore();
+      _ensureCurrent(operation, token);
+      ref.read(currentProfileIdProvider.notifier).value = cached.id;
+      await ref
+          .read(setupActionProvider.notifier)
+          .applyProfile(force: true, silence: true);
+      _ensureCurrent(operation, token);
+    }();
+    _offlineProxyPreparation = preparation;
+    try {
+      await preparation;
+    } finally {
+      if (identical(_offlineProxyPreparation, preparation)) {
+        _offlineProxyPreparation = null;
+      }
     }
   }
 

@@ -103,6 +103,8 @@ const (
 	stopLogMethod                  Method = "stopLog"
 	startListenerMethod            Method = "startListener"
 	stopListenerMethod             Method = "stopListener"
+	startSubscriptionProxyMethod   Method = "startSubscriptionProxy"
+	stopSubscriptionProxyMethod    Method = "stopSubscriptionProxy"
 	updateDnsMethod                Method = "updateDns"
 	crashMethod                    Method = "crash"
 	setupConfigMethod              Method = "setupConfig"
