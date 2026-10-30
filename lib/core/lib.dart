@@ -1,42 +1,37 @@
 import 'dart:async';
 
 import 'package:fl_clash/common/common.dart';
-import 'package:fl_clash/enum/enum.dart';
-import 'package:fl_clash/models/core.dart';
 import 'package:fl_clash/plugins/service.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/state.dart';
 import 'package:flutter/foundation.dart' show visibleForTesting;
 
+import 'desktop/model.dart';
 import 'interface.dart';
+import 'method.dart';
+import 'spill.dart';
 
 class CoreLib extends CoreHandlerInterface {
   static CoreLib? _instance;
 
-  Completer<bool> _connectedCompleter = Completer();
   final Service? _service;
+  final bool _isOhos;
 
-  CoreLib._internal() : _service = service;
+  Completer<bool> _connectedCompleter = Completer<bool>();
+  Future<CoreLifecycleResult>? _closeOperation;
+  int _lifecycleRevision = 0;
+  int _methodCallId = 0;
+  bool _closed = false;
+
+  CoreLib._internal() : _service = service, _isOhos = system.isOhos;
 
   @visibleForTesting
-  CoreLib.test(Service service) : _service = service {
-    _connectedCompleter.complete(true);
-  }
+  CoreLib.scoped(Service this._service, {bool? isOhos})
+    : _isOhos = isOhos ?? system.isOhos;
 
-  @override
-  Future<String> preload() async {
-    if (_connectedCompleter.isCompleted) {
-      return 'core is connected';
-    }
-    final res = await _service?.init();
-    if (res?.isEmpty != true) {
-      return res ?? '';
-    }
-    _connectedCompleter.complete(true);
-    final syncRes = await _service?.syncState(
-      globalState.container.read(sharedStateProvider),
-    );
-    return syncRes ?? '';
+  @visibleForTesting
+  static void resetInstance() {
+    _instance = null;
   }
 
   factory CoreLib() {
@@ -45,71 +40,154 @@ class CoreLib extends CoreHandlerInterface {
   }
 
   @override
-  FutureOr<bool> destroy() async {
-    return true;
+  Future<CoreLifecycleResult> start() async {
+    if (_closed) {
+      throw StateError('Core lifecycle is closed');
+    }
+    final revision = ++_lifecycleRevision;
+    if (_connectedCompleter.isCompleted) {
+      return CoreLifecycleResult(
+        revision: revision,
+        outcome: CoreLifecycleOutcome.coalesced,
+      );
+    }
+    final initializationError = await _service?.init() ?? '';
+    if (initializationError.isNotEmpty) {
+      throw StateError(initializationError);
+    }
+    await globalState.container.read(vpnOptionsProvider.future);
+    _connectedCompleter.complete(true);
+    final syncError =
+        await _service?.syncState(
+          globalState.container.read(sharedStateProvider),
+        ) ??
+        '';
+    if (syncError.isNotEmpty) {
+      _connectedCompleter = Completer<bool>();
+      await _service?.shutdown();
+      throw StateError(syncError);
+    }
+    return CoreLifecycleResult(
+      revision: revision,
+      outcome: CoreLifecycleOutcome.applied,
+    );
   }
 
   @override
-  Future<bool> shutdown(_) async {
-    if (!_connectedCompleter.isCompleted) {
-      return false;
-    }
-    _connectedCompleter = Completer();
-    return _service?.shutdown() ?? true;
+  Future<CoreLifecycleResult> restart() async {
+    await stop();
+    return start();
   }
 
+  @override
+  Future<CoreLifecycleResult> stop() => _stop();
+
+  Future<CoreLifecycleResult> _stop({bool allowClosed = false}) async {
+    if (_closed && !allowClosed) {
+      throw StateError('Core lifecycle is closed');
+    }
+    final revision = ++_lifecycleRevision;
+    if (!_connectedCompleter.isCompleted) {
+      return CoreLifecycleResult(
+        revision: revision,
+        outcome: CoreLifecycleOutcome.coalesced,
+      );
+    }
+    _connectedCompleter = Completer<bool>();
+    final stopped = await _service?.shutdown() ?? true;
+    if (!stopped) {
+      throw StateError('Mobile Core service shutdown failed');
+    }
+    return CoreLifecycleResult(
+      revision: revision,
+      outcome: CoreLifecycleOutcome.applied,
+    );
+  }
+
+  @override
+  Future<CoreLifecycleResult> close() {
+    return _closeOperation ??= _close();
+  }
+
+  Future<CoreLifecycleResult> _close() async {
+    _closed = true;
+    return _stop(allowClosed: true);
+  }
+
+  // The service opens and closes the Core's listeners itself and reports a run
+  // that ends, so once it takes the command the Core's own answer is moot.
   @override
   Future<bool> startListener() async {
-    if (!await super.startListener()) {
-      throw StateError('Core listener did not start');
-    }
-    try {
-      if (await _service?.start() != true) {
-        throw StateError('VPN service did not start');
-      }
-      return true;
-    } catch (_) {
+    if (_isOhos) {
+      if (!await super.startListener()) return false;
       try {
-        await super.stopListener();
+        final accepted = await _service?.start() ?? false;
+        if (accepted) return true;
       } catch (_) {
-        // Preserve the startup failure when best-effort rollback also fails.
+        try {
+          await super.stopListener();
+        } catch (_) {}
+        rethrow;
       }
-      rethrow;
+      await super.stopListener();
+      return false;
     }
+    await super.startListener();
+    return await _service?.start() ?? false;
   }
 
   @override
   Future<bool> stopListener() async {
-    try {
-      if (!await super.stopListener()) {
-        throw StateError('Core listener did not stop');
-      }
-    } finally {
-      if (await _service?.stop() != true) {
-        throw StateError('VPN service did not stop');
+    if (_isOhos) {
+      try {
+        return await _service?.stop() ?? false;
+      } finally {
+        await super.stopListener();
       }
     }
-    return true;
+    final serviceStopped = await _service?.stop() ?? false;
+    await super.stopListener();
+    return serviceStopped;
   }
 
   @override
-  Future<T?> invoke<T>({
-    required ActionMethod method,
-    dynamic data,
+  Future<T?> invokeMethod<T>({
+    required CoreMethod method,
+    Object? arguments,
     Duration? timeout,
+  }) {
+    final call = _invokeMethod<T>(method: method, arguments: arguments);
+    return call.withTimeout(
+      timeout: timeout,
+      onTimeout: () {
+        unawaited(call.then(discardSpilledFile, onError: (_) {}));
+        return null;
+      },
+    );
+  }
+
+  Future<T?> _invokeMethod<T>({
+    required CoreMethod method,
+    Object? arguments,
   }) async {
-    final id = '${method.name}#${utils.id}';
-    final result = await _service
-        ?.invokeAction(Action(id: id, method: method, data: data))
-        .withTimeout(onTimeout: () => null);
-    if (result == null) {
+    try {
+      await _connectedCompleter.future.timeout(coreConnectionWaitDuration);
+    } catch (error) {
+      commonPrint.log(
+        'Invoke method ${method.name} before connection timed out: $error',
+        logLevel: coreFailureLogLevel(error),
+      );
       return null;
     }
-    return parasResult<T>(result);
+    final id = '${++_methodCallId}';
+    final response = await _service?.invokeMethod(
+      CoreMethodCall(id: id, method: method, arguments: arguments),
+    );
+    if (response == null) {
+      return null;
+    }
+    return response.unwrap<T>();
   }
-
-  @override
-  Completer get completer => _connectedCompleter;
 }
 
-CoreLib? get coreLib => system.isAndroid || system.isOhos ? CoreLib() : null;
+CoreLib? get coreLib => system.isMobile ? CoreLib() : null;

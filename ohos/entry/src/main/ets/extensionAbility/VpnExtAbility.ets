@@ -2,11 +2,10 @@ import { vpnExtension, VpnExtensionAbility, connection } from '@kit.NetworkKit'
 import { Want, bundleManager } from '@kit.AbilityKit'
 import { rpc } from '@kit.IPCKit'
 import { deviceInfo } from '@kit.BasicServicesKit'
-import { setEventListener, invokeAction, startTUN, stopTun, forceGC, suspend, updateDns, quickSetup } from 'core'
+import { setEventListener, invokeMethod, startTUN, stopTun, forceGC, updateDns, resetNetwork, quickSetup } from 'core'
 import { AccessControlMode, VpnOptions } from '../models/State'
 import { ChunkedSender, ChunkedReader } from '../utils/Rpc'
 import AbilityConstant from '@ohos.app.ability.AbilityConstant';
-import PowerManager from '../managers/PowerManager'
 import NetworkManager from '../managers/NetworkManager'
 import { publishEvent } from '../utils/Event'
 
@@ -18,7 +17,7 @@ const NET_ANY = "0.0.0.0"
 const NET_ANY6 = "::"
 
 export enum RPCType{
-  invokeAction,
+  invokeMethod,
   quickSetup,
   updateNotificationParams,
   startService,
@@ -46,11 +45,11 @@ export class ServiceStub extends rpc.RemoteObject {
       const remote = send.readRemoteObject() as rpc.RemoteObject
       this.parent.handleSetEventListener(remote)
       return true
-    } else if (code === RPCType.invokeAction) {
+    } else if (code === RPCType.invokeMethod) {
       const data = this.reader.read(send)
       if (data === null) return true
       const remote = send.readRemoteObject() as rpc.RemoteObject
-      this.parent.handleInvokeAction(data, remote)
+      this.parent.handleInvokeMethod(data, remote)
       return true
     } else if (code === RPCType.startService) {
       const raw = this.reader.read(send)
@@ -65,8 +64,7 @@ export class ServiceStub extends rpc.RemoteObject {
       this.parent.handleStopService(remote)
       return true
     } else if (code === RPCType.getRunTime) {
-      this.parent.handleGetRunTime(reply)
-      return true
+      return this.parent.handleGetRunTime(reply).then(() => true)
     } else if (code === RPCType.quickSetup) {
       const setupParams = this.reader.read(send)
       if (setupParams === null) return true
@@ -92,7 +90,7 @@ export default class VpnExtAbility extends VpnExtensionAbility {
   private destroyed: boolean = false
   private operation: Promise<void> = Promise.resolve()
   private protectFailurePending: boolean = false
-  private powerManager: PowerManager | undefined
+  private intentRevision: number = 0
   private networkManager: NetworkManager | undefined
   private runTime: number = 0
   private sender: ChunkedSender = new ChunkedSender()
@@ -101,12 +99,12 @@ export default class VpnExtAbility extends VpnExtensionAbility {
   onCreate(want: Want): void {
     this.destroyed = false
     this.vpnConnection = vpnExtension.createVpnConnection(this.context)
-    this.powerManager = new PowerManager()
     this.networkManager = new NetworkManager()
   }
 
   onDestroy(): void {
     this.destroyed = true
+    this.intentRevision++
     this.service?.clearPendingMessages()
     setEventListener()
     this.enqueue(async (): Promise<void> => { await this.stopService() })
@@ -167,7 +165,7 @@ export default class VpnExtAbility extends VpnExtensionAbility {
       routes,
       dnsAddresses,
       // NetworkKit accepts MTUs from 576 to 1500; keep the virtual interface valid.
-      mtu: 1500,
+      mtu: this.tunMtu(options),
       isIPv4Accepted: true,
       isIPv6Accepted: options.ipv6,
       isBlocking: !options.allowBypass,
@@ -183,6 +181,11 @@ export default class VpnExtAbility extends VpnExtensionAbility {
     }
 
     return config
+  }
+
+  private tunMtu(options: VpnOptions): number {
+    if (!(options.mtu > 0)) return 1500
+    return Math.max(options.ipv6 ? 1280 : 576, Math.min(1500, options.mtu))
   }
 
   private toTunAddress(options: VpnOptions): string {
@@ -213,26 +216,29 @@ export default class VpnExtAbility extends VpnExtensionAbility {
     return { address, family, port }
   }
 
-  private resolverProcess(protocol: number, source: string, target: string, uid: number): string {
-    let nextUid = uid
+  private resolveUid(protocol: number, source: string, target: string): number {
     try {
       if (deviceInfo.sdkApiVersion >= 23) {
-        nextUid = connection.getConnectOwnerUidSync(protocol, this.toNetAddress(source), this.toNetAddress(target))
+        return connection.getConnectOwnerUidSync(protocol, this.toNetAddress(source), this.toNetAddress(target))
       }
     } catch (err) {
       // A socket can disappear between TUN delivery and the owner lookup.
-      return ''
+      return -1
     }
-    if (nextUid === -1) return ''
-    if (!this.uidBundleNameMap.has(nextUid)) {
+    return -1
+  }
+
+  private resolvePackage(uid: number): string {
+    if (uid < 0) return ''
+    if (!this.uidBundleNameMap.has(uid)) {
       try {
-        this.uidBundleNameMap.set(nextUid, bundleManager.getBundleNameByUidSync(nextUid))
+        this.uidBundleNameMap.set(uid, bundleManager.getBundleNameByUidSync(uid))
       } catch (err) {
-        this.uidBundleNameMap.set(nextUid, '')
+        return ''
       }
     }
 
-    return this.uidBundleNameMap.get(nextUid) ?? ''
+    return this.uidBundleNameMap.get(uid) ?? ''
   }
 
   private sendCallback(remote: rpc.RemoteObject, data: string): void {
@@ -260,8 +266,8 @@ export default class VpnExtAbility extends VpnExtensionAbility {
     setEventListener((callbackData: string) => { this.sendCallback(remote, callbackData) })
   }
 
-  handleInvokeAction(data: string, remote: rpc.RemoteObject): void {
-    invokeAction((callbackData: string) => { this.sendCallback(remote, callbackData) }, data)
+  handleInvokeMethod(data: string, remote: rpc.RemoteObject): void {
+    invokeMethod((callbackData: string) => { this.sendCallback(remote, callbackData) }, data)
   }
 
   private enqueue(operation: () => Promise<void>): void {
@@ -301,7 +307,6 @@ export default class VpnExtAbility extends VpnExtensionAbility {
         this.tunStarted = false
       } catch (err) { error = `Stop TUN failed: ${err}` }
     }
-    try { await this.powerManager?.unsubscribe() } catch (err) { error = error || `Power cleanup failed: ${err}` }
     try { await this.networkManager?.unsubscribe() } catch (err) { error = error || `Network cleanup failed: ${err}` }
     if (this.vpnCreated) {
       try {
@@ -313,9 +318,11 @@ export default class VpnExtAbility extends VpnExtensionAbility {
   }
 
   handleStartService(vpnOptions: VpnOptions, runTime: number, remote: rpc.RemoteObject): void {
+    const revision = ++this.intentRevision
     this.enqueue(async (): Promise<void> => {
       try {
         if (this.destroyed) throw new Error('VPN service has been destroyed')
+        if (revision !== this.intentRevision) throw new Error('VPN start was superseded')
         if (this.runTime !== 0) {
           this.sendResult(remote, this.runTime)
           return
@@ -328,20 +335,21 @@ export default class VpnExtAbility extends VpnExtensionAbility {
           if (!vpnConnection) throw new Error('VPN connection is unavailable')
           const fd = await vpnConnection.create(this.toVpnConfig(vpnOptions))
           this.vpnCreated = true
-          if (this.destroyed) throw new Error('VPN service was destroyed during startup')
+          if (this.destroyed || revision !== this.intentRevision) throw new Error('VPN startup was superseded')
           this.tunStarted = startTUN(
             (socketFd: number): Promise<void> => this.protectSocket(socketFd),
-            (protocol: number, source: string, target: string, uid: number) => this.resolverProcess(protocol, source, target, uid),
+            (protocol: number, source: string, target: string) => this.resolveUid(protocol, source, target),
+            (uid: number) => this.resolvePackage(uid),
             fd,
             vpnOptions.stack,
             this.toTunAddress(vpnOptions),
             this.toTunDns(vpnOptions),
+            JSON.stringify({ mtu: this.tunMtu(vpnOptions), 'congestion-controller': vpnOptions.congestionController ?? '' }),
           )
           if (!this.tunStarted) throw new Error('Mihomo TUN initialization failed')
         }
-        await this.powerManager?.subscribe(suspend)
-        await this.networkManager?.subscribe(updateDns)
-        if (this.destroyed) throw new Error('VPN service was destroyed during startup')
+        await this.networkManager?.subscribe(updateDns, resetNetwork)
+        if (this.destroyed || revision !== this.intentRevision) throw new Error('VPN startup was superseded')
         this.runTime = runTime > 0 ? runTime : Date.now()
         this.sendResult(remote, this.runTime)
       } catch (err) {
@@ -353,6 +361,7 @@ export default class VpnExtAbility extends VpnExtensionAbility {
   }
 
   handleStopService(remote: rpc.RemoteObject): void {
+    this.intentRevision++
     this.enqueue(async (): Promise<void> => {
       try {
         await this.stopService()
@@ -363,7 +372,13 @@ export default class VpnExtAbility extends VpnExtensionAbility {
     })
   }
 
-  handleGetRunTime(reply: rpc.MessageSequence): void {
+  async handleGetRunTime(reply: rpc.MessageSequence): Promise<void> {
+    let operation = this.operation
+    await operation
+    while (operation !== this.operation) {
+      operation = this.operation
+      await operation
+    }
     reply.writeLong(this.runTime)
   }
 

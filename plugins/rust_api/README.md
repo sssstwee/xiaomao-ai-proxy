@@ -1,5 +1,15 @@
-# CC保镖
+# rust_api
 
-CC保镖 is a proxy client for HarmonyOS. CC stands for Claude and Codex, whose connections it helps protect.
+Flutter Rust Bridge FFI package for FlClash. The Rust crate under `rust/` is compiled by the Dart build hook in
+`hook/build.dart` through Native Assets, so there are no platform folders: Flutter runs the hook during every build
+and bundles the resulting `librust_api` itself.
 
-Download the HAP from [Releases](https://github.com/sssstwee/xiaomao-ai-proxy/releases). If unsigned, sign it with a HarmonyOS debug certificate and profile containing your phone’s UDID, then install it using DevEco Studio with developer mode and USB debugging enabled on your HarmonyOS phone.
+## Requirements
+
+- `rustup`, with the toolchain and targets pinned in `rust/rust-toolchain.toml` (installed on first build).
+- The Android NDK for Android builds.
+- `flutter_rust_bridge_codegen` matching the `flutter_rust_bridge` version in `pubspec.yaml`, to regenerate bindings:
+
+```bash
+flutter_rust_bridge_codegen generate
+```

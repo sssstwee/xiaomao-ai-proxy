@@ -220,9 +220,9 @@ export default class EntryAbility extends FlutterAbility {
     return this.disconnect()
   }
 
-  handleInvokeAction(data: string, callbackStub: CallbackStub): Promise<rpc.RequestResult> {
+  handleInvokeMethod(data: string, callbackStub: CallbackStub): Promise<rpc.RequestResult> {
     return this.ensureConnected().then((remote: rpc.RemoteObject) => {
-      return this.sender.send(remote, RPCType.invokeAction, data, (send: rpc.MessageSequence) => {
+      return this.sender.send(remote, RPCType.invokeMethod, data, (send: rpc.MessageSequence) => {
         send.writeRemoteObject(callbackStub)
       })
     })

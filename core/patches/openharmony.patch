@@ -5,9 +5,9 @@ index c1174f08..005a32f6 100644
 @@ -1,4 +1,4 @@
 -//go:build android
 +//go:build android || openharmony
-
+ 
  package features
-
+ 
 diff --git a/constant/features/android_stub.go b/constant/features/android_stub.go
 index 282493e7..7d4815bd 100644
 --- a/constant/features/android_stub.go
@@ -15,9 +15,9 @@ index 282493e7..7d4815bd 100644
 @@ -1,4 +1,4 @@
 -//go:build !android
 +//go:build !android && !openharmony
-
+ 
  package features
-
+ 
 diff --git a/dns/patch_openharmony.go b/dns/patch_openharmony.go
 new file mode 100644
 index 00000000..f7771d81
@@ -65,8 +65,30 @@ diff --git a/dns/system_common.go b/dns/system_common.go
 index 78c4a86f..599138de 100644
 --- a/dns/system_common.go
 +++ b/dns/system_common.go
-@@ -1,3 +1,3 @@
+@@ -1,4 +1,4 @@
 -//go:build !android
 +//go:build !android && !openharmony
-
+ 
  package dns
+ 
+diff --git a/rules/common/uid.go b/rules/common/uid.go
+index 535565c5..6a1ec3d8 100644
+--- a/rules/common/uid.go
++++ b/rules/common/uid.go
+@@ -6,6 +6,7 @@ import (
+ 
+ 	"github.com/metacubex/mihomo/common/utils"
+ 	C "github.com/metacubex/mihomo/constant"
++	"github.com/metacubex/mihomo/constant/features"
+ 	"github.com/metacubex/mihomo/log"
+ )
+ 
+@@ -17,7 +18,7 @@ type Uid struct {
+ }
+ 
+ func NewUid(oUid, adapter string) (*Uid, error) {
+-	if !(runtime.GOOS == "linux" || runtime.GOOS == "android") {
++	if !(runtime.GOOS == "linux" || runtime.GOOS == "android" || features.Android) {
+ 		return nil, fmt.Errorf("uid rule not support this platform")
+ 	}
+ 

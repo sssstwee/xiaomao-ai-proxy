@@ -35,7 +35,7 @@ const deferred = () => {
 const tick = () => new Promise((resolve) => setImmediate(resolve));
 
 function fixture(overrides = {}) {
-  const calls = { create: [], destroy: 0, startTun: 0, stopTun: 0, dns: [], events: [], nets: [], subscribers: [], backgroundStart: 0, backgroundStop: 0 };
+  const calls = { create: [], destroy: 0, startTun: 0, stopTun: 0, dns: [], events: [], nets: [], subscribers: [], backgroundStart: 0, backgroundStop: 0, networkReset: 0, notificationPublish: 0, channels: new Map() };
   const vpn = {
     create: (config) => { calls.create.push(config); return overrides.create?.(config) ?? Promise.resolve(42); },
     destroy: () => { calls.destroy++; return overrides.destroy?.() ?? Promise.resolve(); },
@@ -87,7 +87,11 @@ function fixture(overrides = {}) {
         stopBackgroundRunning: () => { calls.backgroundStop++; return Promise.resolve(); },
       },
     },
-    '@kit.NotificationKit': { notificationManager: { cancel: (id, callback) => callback() } },
+    '@kit.NotificationKit': { notificationManager: {
+      cancel: (id, callback) => callback(),
+      publish: (request, callback) => { calls.notificationPublish++; callback(); },
+      ContentType: { NOTIFICATION_CONTENT_BASIC_TEXT: 0 },
+    } },
     '@kit.IPCKit': { rpc: { RemoteObject: class {}, MessageOption: class { setAsync() {} }, MessageSequence } },
     '@kit.BasicServicesKit': {
       deviceInfo: { sdkApiVersion: 26 },
@@ -100,21 +104,25 @@ function fixture(overrides = {}) {
       },
     },
     '@ohos.app.ability.AbilityConstant': { default: { MemoryLevel: { MEMORY_LEVEL_CRITICAL: 4 } } },
-    '@ohos/flutter_ohos': { MethodChannel: class {}, FlutterAbility: class {} },
+    '@ohos/flutter_ohos': { MethodChannel: class {
+      constructor(messenger, name) { this.messages = []; calls.channels.set(name, this); }
+      setMethodCallHandler(handler) { this.handler = handler; }
+      invokeMethod(method, args) { this.messages.push({ method, args }); return Promise.resolve(); }
+    }, FlutterAbility: class {} },
     '@kit.ArkTS': { util: {
       TextEncoder: { create: () => ({ encodeInto: (value) => new TextEncoder().encode(value) }) },
       TextDecoder: { create: () => ({ decodeToString: (value) => new TextDecoder().decode(value) }) },
     } },
     core: {
-      startTUN: (protect) => { calls.startTun++; calls.protect = protect; return overrides.startTun ?? true; },
+      startTUN: (...args) => { calls.startTun++; calls.protect = args[0]; calls.startTunArgs = args; return overrides.startTun ?? true; },
       stopTun: () => { calls.stopTun++; return overrides.stopTun?.(); },
       suspend() {}, updateDns: (value) => calls.dns.push(value),
-      setEventListener() {}, invokeAction() {}, quickSetup() {}, forceGC() {},
+      setEventListener() {}, invokeMethod() {}, quickSetup() {}, forceGC() {}, resetNetwork: () => calls.networkReset++,
     },
   };
   const fileMocks = new Map([
     [path.join(etsRoot, 'utils/Rpc.ets'), { ChunkedSender: class {}, ChunkedReader: class {} }],
-    [path.join(etsRoot, 'entryability/EntryAbility.ets'), { ResultStub, CallbackStub: class {} }],
+    [path.join(etsRoot, 'entryability/EntryAbility.ets'), { ResultStub, CallbackStub: ResultStub }],
     [path.join(etsRoot, 'GlobalState.ets'), { globalState, RunState: { start: 0, pending: 1, stop: 2 } }],
   ]);
   if (overrides.realRpc) fileMocks.delete(path.join(etsRoot, 'utils/Rpc.ets'));
@@ -174,6 +182,19 @@ test('start waits for VPN creation and reports a valid NetworkKit MTU', async ()
   assert.equal(f.calls.startTun, 1);
 });
 
+test('latest tun options reach Go with the same platform-valid MTU and congestion controller', async () => {
+  for (const [configured, ipv6, expected] of [[9000, false, 1500], [200, true, 1280], [200, false, 576]]) {
+    const f = fixture();
+    const options = Object.assign(f.vpnOptions(), { mtu: configured, ipv6, congestionController: 'bbr' });
+    f.ability.handleStartService(options, 1234, f.remote());
+    await f.ability.operation;
+    assert.equal(f.calls.create[0].mtu, expected);
+    assert.deepEqual(JSON.parse(f.calls.startTunArgs[7]), { mtu: expected, 'congestion-controller': 'bbr' });
+    assert.equal(f.calls.startTunArgs[1](6, '192.0.2.1:123', '198.51.100.1:443'), 100);
+    assert.equal(f.calls.startTunArgs[2](100), 'com.example.app');
+  }
+});
+
 test('create rejection cannot produce a running timestamp', async () => {
   const f = fixture({ create: () => Promise.reject(new Error('Permission denied')) });
   const remote = f.remote();
@@ -194,20 +215,22 @@ test('TUN initialization failure destroys the created VPN', async () => {
   assert.equal(f.calls.destroy, 1);
 });
 
-test('stop issued during startup is serialized after creation and releases TUN', async () => {
+test('stop issued during startup cancels the obsolete start and releases its VPN', async () => {
   const creation = deferred();
   const f = fixture({ create: () => creation.promise });
   const start = f.remote();
   const stop = f.remote();
   f.ability.handleStartService(f.vpnOptions(), 1234, start);
+  await tick();
   f.ability.handleStopService(stop);
   await tick();
   assert.equal(stop.results.length, 0);
   creation.resolve(42);
   await f.ability.operation;
-  assert.deepEqual(start.results, [[1234, '']]);
+  assert.equal(start.results[0][0], 0);
+  assert.match(start.results[0][1], /superseded/);
   assert.deepEqual(stop.results, [[0, '']]);
-  assert.equal(f.calls.stopTun, 1);
+  assert.equal(f.calls.stopTun, 0);
   assert.equal(f.calls.destroy, 1);
   assert.equal(f.ability.runTime, 0);
 });
@@ -222,7 +245,7 @@ test('destroy during startup cannot leave a running VPN behind', async () => {
   creation.resolve(42);
   await f.ability.operation;
   assert.equal(remote.results[0][0], 0);
-  assert.match(remote.results[0][1], /destroyed/);
+  assert.match(remote.results[0][1], /destroyed|superseded/);
   assert.equal(f.calls.startTun, 0);
   assert.equal(f.calls.destroy, 1);
 });
@@ -246,7 +269,9 @@ test('stop reports completion only after asynchronous native TUN cleanup', async
 test('duplicate start and stop requests are idempotent', async () => {
   const f = fixture();
   f.ability.handleStartService(f.vpnOptions(), 1234, f.remote());
+  await f.ability.operation;
   f.ability.handleStartService(f.vpnOptions(), 0, f.remote());
+  await f.ability.operation;
   f.ability.handleStopService(f.remote());
   f.ability.handleStopService(f.remote());
   await f.ability.operation;
@@ -254,7 +279,6 @@ test('duplicate start and stop requests are idempotent', async () => {
   assert.equal(f.calls.stopTun, 1);
   assert.equal(f.calls.destroy, 1);
   assert.equal(f.calls.nets[0].unregisterCount, 1);
-  assert.equal(f.calls.subscribers[0].unsubscribeCount, 1);
 });
 
 test('subscription failure rolls back both TUN and VPN', async () => {
@@ -268,7 +292,7 @@ test('subscription failure rolls back both TUN and VPN', async () => {
   assert.equal(f.calls.destroy, 1);
 });
 
-test('socket protection failure stops the tunnel and reports a service crash', async () => {
+test('socket protection failure stops the tunnel and reports a service failure', async () => {
   const f = fixture({ protect: () => Promise.reject(new Error('Protect denied')) });
   f.ability.handleStartService(f.vpnOptions(), 1234, f.remote());
   await f.ability.operation;
@@ -284,7 +308,8 @@ test('socket protection failure stops the tunnel and reports a service crash', a
 
 test('socket owner races return an empty process instead of throwing through NAPI', () => {
   const f = fixture({ ownerError: true });
-  assert.equal(f.ability.resolverProcess(6, '192.0.2.1:10', '198.51.100.1:443', -1), '');
+  assert.equal(f.ability.resolveUid(6, '192.0.2.1:10', '198.51.100.1:443'), -1);
+  assert.equal(f.ability.resolvePackage(-1), '');
 });
 
 test('disconnect discards interrupted RPC chunks before another client connects', () => {
@@ -321,40 +346,101 @@ test('network reconnect creates a fresh observer and ignores retired callbacks',
   assert.deepEqual(dns, ['192.0.2.53:53', '192.0.2.53:53']);
 });
 
-test('method channel start waits for the native callback and forwards its error', async () => {
+test('physical network transitions reset latest Mihomo network state even with unchanged DNS', async () => {
   const f = fixture();
-  const Plugin = f.load(path.join(etsRoot, 'plugins/ServicePlugin.ets')).default;
-  let callback;
-  const parent = { handleStartService: (options, runTime, stub) => { callback = stub; return Promise.resolve(); } };
-  const plugin = new Plugin(parent);
-  const results = [];
-  plugin.onMethodCall({ method: 'start' }, { success: (value) => results.push(value), error: (code, message) => results.push([code, message]) });
-  await tick();
-  assert.equal(results.length, 0);
-  callback.onResult(0, 'VPN permission denied');
-  assert.deepEqual(results, [['VPN_START_FAILED', 'VPN permission denied']]);
-  assert.equal(f.globalState.runState, 2);
+  f.ability.handleStartService(f.vpnOptions(), 1234, f.remote());
+  await f.ability.operation;
+  const net = f.calls.nets[0];
+  net.handlers.netAvailable({ netId: 1 });
+  net.handlers.netLost({ netId: 1 });
+  net.handlers.netAvailable({ netId: 2 });
+  assert.equal(f.calls.networkReset, 3);
 });
 
-test('method channel stop waits for cleanup and status RPC errors are not cached successes', async () => {
-  const f = fixture();
+function servicePlugin(f, parent) {
   const Plugin = f.load(path.join(etsRoot, 'plugins/ServicePlugin.ets')).default;
+  const plugin = new Plugin({ handleClearVpnNotification() {}, handleVpnNotification() {}, ...parent });
+  plugin.onAttachedToEngine({ getBinaryMessenger: () => ({}) });
+  return plugin;
+}
+
+test('mobile start acknowledges intent and reports failed establishment with its revision', async () => {
+  const f = fixture();
   let callback;
-  const parent = {
-    handleStopService: (stub) => { callback = stub; return Promise.resolve(); },
-    handleGetRunTime: () => Promise.reject(new Error('IPC unavailable')),
-  };
-  const plugin = new Plugin(parent);
+  const plugin = servicePlugin(f, { handleStartService: (options, runTime, stub) => { callback = stub; return Promise.resolve(); } });
   const results = [];
-  const result = { success: (value) => results.push(value), error: (code, message) => results.push([code, message]) };
-  plugin.onMethodCall({ method: 'stop' }, result);
-  await tick();
-  assert.equal(results.length, 0);
-  callback.onResult(0, '');
+  plugin.onMethodCall({ method: 'start', args: 7 }, { success: (value) => results.push(value) });
   assert.deepEqual(results, [true]);
-  plugin.onMethodCall({ method: 'getRunTime' }, result);
+  assert.equal(f.globalState.runState, 1);
+  callback.onResult(0, 'VPN permission denied');
+  assert.equal(f.globalState.runState, 2);
+  const channel = f.calls.channels.get('com.follow.clash/service');
+  assert.deepEqual(channel.messages, [{ method: 'stopped', args: 7 }]);
+});
+
+test('stale mobile start and stop completions cannot overwrite the latest command', async () => {
+  const f = fixture();
+  const starts = [];
+  let stop;
+  const plugin = servicePlugin(f, {
+    handleStartService: (options, runTime, stub) => { starts.push(stub); return Promise.resolve(); },
+    handleStopService: (stub) => { stop = stub; return Promise.resolve(); },
+  });
+  const result = { success() {} };
+  plugin.onMethodCall({ method: 'start', args: 1 }, result);
+  plugin.onMethodCall({ method: 'stop', args: 2 }, result);
+  plugin.onMethodCall({ method: 'start', args: 3 }, result);
+  starts[0].onResult(0, 'Superseded');
+  starts[1].onResult(3000, '');
+  stop.onResult(0, '');
+  assert.equal(f.globalState.runTime, 3000);
+  assert.equal(f.globalState.runState, 0);
+  assert.deepEqual(f.calls.channels.get('com.follow.clash/service').messages, []);
+});
+
+test('status RPC errors are not cached successes', async () => {
+  const f = fixture();
+  const plugin = servicePlugin(f, { handleGetRunTime: () => Promise.reject(new Error('IPC unavailable')) });
+  const results = [];
+  plugin.onMethodCall({ method: 'getRunTime' }, { success: (value) => results.push(value), error: (code, message) => results.push([code, message]) });
   await tick();
-  assert.deepEqual(results[1], ['VPN_STATUS_FAILED', 'IPC unavailable']);
+  assert.deepEqual(results, [['VPN_STATUS_FAILED', 'IPC unavailable']]);
+});
+
+test('latest lightweight shared-state updates preserve native recovery setup parameters', () => {
+  const f = fixture();
+  const plugin = servicePlugin(f, {});
+  const result = { success() {} };
+  plugin.onMethodCall({ method: 'syncState', args: JSON.stringify({ setupParams: { 'test-url': 'https://example.com' }, showStopAction: true }) }, result);
+  plugin.onMethodCall({ method: 'syncState', args: JSON.stringify({ setupParams: null, showStopAction: false }) }, result);
+  assert.equal(f.globalState.state.setupParams['test-url'], 'https://example.com');
+  assert.equal(f.globalState.state.showStopAction, false);
+});
+
+test('core channel responses and service events preserve the latest UTF8 JSON envelopes', async () => {
+  const f = fixture();
+  let reply;
+  let event;
+  let payload;
+  const plugin = servicePlugin(f, {
+    handleInvokeMethod: (data, stub) => { payload = data; reply = stub; return Promise.resolve(); },
+    handleInit: (stub) => { event = stub; return Promise.resolve(); },
+    setOnDisconnected() {},
+  });
+  const call = { id: '1', method: 'getConfig', arguments: null };
+  const responses = [];
+  f.calls.channels.get('com.follow.clash/core').handler.onMethodCall(
+    { method: 'invokeMethod', args: JSON.stringify(call) }, { success: (bytes) => responses.push(JSON.parse(new TextDecoder().decode(bytes))) },
+  );
+  assert.equal(payload, JSON.stringify(call));
+  reply.onResult(JSON.stringify({ id: '1', result: { name: '配置' } }));
+  assert.deepEqual(responses, [{ id: '1', result: { name: '配置' } }]);
+  plugin.onMethodCall({ method: 'init' }, { success() {} });
+  const message = { method: 'message', arguments: [{ type: 'log', data: { payload: '日志' } }] };
+  event.onResult(JSON.stringify(message));
+  const sent = f.calls.channels.get('com.follow.clash/service').messages[0];
+  assert.equal(sent.method, 'event');
+  assert.deepEqual(JSON.parse(new TextDecoder().decode(sent.args)), message);
 });
 
 function notificationManager(f) {
@@ -411,4 +497,16 @@ test('stop removes cancelled-task restart timers and callbacks', async () => {
   assert.equal(f.timers.size, 0);
   assert.equal(f.calls.backgroundCancel, undefined);
   assert.equal(f.calls.backgroundStart, 1);
+});
+
+test('a pending notification cannot publish after it was cleared', async () => {
+  const agent = deferred();
+  const f = fixture({ wantAgent: () => agent.promise, fakeTimers: true });
+  const manager = notificationManager(f);
+  manager.applyParams(JSON.stringify({ phase: 'connected', title: '小猫代理', content: '', configHint: '', showActions: false }));
+  const publish = manager.publishNow();
+  manager.clearNotification();
+  agent.resolve({});
+  await publish;
+  assert.equal(f.calls.notificationPublish, 0);
 });

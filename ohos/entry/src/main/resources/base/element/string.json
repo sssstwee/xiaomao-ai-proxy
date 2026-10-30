@@ -2,11 +2,11 @@
   "string": [
     {
       "name": "module_desc",
-      "value": "module description"
+      "value": "小猫代理客户端"
     },
     {
       "name": "EntryAbility_desc",
-      "value": "description"
+      "value": "小猫代理主界面"
     },
     {
       "name": "EntryAbility_label",
@@ -14,7 +14,7 @@
     },
     {
       "name": "TempAbility_desc",
-      "value": "description"
+      "value": "保持后台代理连接"
     },
     {
       "name": "TempAbility_label",
@@ -22,51 +22,51 @@
     },
     {
       "name": "permission_reason_internet",
-      "value": ""
+      "value": "下载订阅和规则并建立代理连接"
     },
     {
       "name": "permission_reason_read_media",
-      "value": ""
+      "value": "读取选择的二维码图片以导入配置"
     },
     {
       "name": "permission_reason_write_media",
-      "value": ""
+      "value": "保存用户导出的配置文件"
     },
     {
       "name": "permission_reason_camera",
-      "value": ""
+      "value": "扫描二维码以导入订阅或配置"
     },
     {
       "name": "permission_reason_get_wifi_info",
-      "value": ""
+      "value": "识别当前Wi-Fi网络以应用按需连接设置"
     },
     {
       "name": "permission_reason_read_pasteboard",
-      "value": ""
+      "value": "读取剪贴板中的订阅链接以导入配置"
     },
     {
       "name": "permission_reason_keep_background_running_system",
-      "value": ""
+      "value": "在系统允许时保持后台代理连接"
     },
     {
       "name": "permission_reason_keep_background_running",
-      "value": ""
+      "value": "保持后台代理连接并显示运行通知"
     },
     {
       "name": "permission_reason_get_network_info",
-      "value": ""
+      "value": "检测网络变化并恢复代理连接"
     },
     {
       "name": "permission_reason_use_fraud_app_picker",
-      "value": ""
+      "value": "选择需要应用分流的已安装应用"
     },
     {
       "name": "widget_desc",
-      "value": ""
+      "value": "显示代理连接状态并打开小猫代理"
     },
     {
       "name": "widget_display_name",
-      "value": ""
+      "value": "小猫代理"
     }
   ]
 }

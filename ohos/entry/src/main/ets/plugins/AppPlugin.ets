@@ -45,6 +45,12 @@ export default class AppPlugin implements FlutterPlugin, MethodCallHandler {
       result.success(true)
     } else if (call.method === "getPackages") {
       this.parent.handleGetPackages(result)
+    } else if (call.method === 'isInstalledAppsPermissionGranted' ||
+      call.method === 'requestInstalledAppsPermission' || call.method === 'requestLocalNetworkPermission') {
+      // HarmonyOS uses the system app picker and INTERNET permission, not Android runtime grants.
+      result.success(true)
+    } else if (call.method === 'getLastExitInfo') {
+      result.success(null)
     } else if (call.method === "getChinaPackageNames") {
       result.success("[]")
     } else if (call.method === "getPackageIcon") {

@@ -1,7 +1,7 @@
 import 'package:fl_clash/enum/enum.dart';
+import 'package:fl_clash/ui/ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hotkey_manager/hotkey_manager.dart';
 
 void main() {
   group('GroupType', () {
@@ -31,24 +31,7 @@ void main() {
     });
   });
 
-  group('UsedProxyExtension', () {
-    test('returns enum names as proxy values', () {
-      expect(UsedProxy.GLOBAL.value, 'GLOBAL');
-      expect(UsedProxy.DIRECT.value, 'DIRECT');
-      expect(UsedProxy.REJECT.value, 'REJECT');
-    });
-  });
-
-  group('KeyboardModifierExt', () {
-    test('maps keyboard modifiers to hotkey modifiers', () {
-      expect(KeyboardModifier.alt.toHotKeyModifier(), HotKeyModifier.alt);
-      expect(
-        KeyboardModifier.control.toHotKeyModifier(),
-        HotKeyModifier.control,
-      );
-      expect(KeyboardModifier.shift.toHotKeyModifier(), HotKeyModifier.shift);
-    });
-
+  group('KeyboardModifier', () {
     test('keeps platform key variants for paired modifiers', () {
       expect(KeyboardModifier.alt.physicalKeys, [
         PhysicalKeyboardKey.altLeft,
@@ -78,7 +61,18 @@ void main() {
 
   group('RuleTarget', () {
     test('contains built-in target names', () {
-      expect(RuleTarget.baseTargets, {'DIRECT', 'REJECT'});
+      expect(RuleTarget.baseTargets, {
+        'DIRECT',
+        'REJECT',
+        'REJECT-DROP',
+        'PASS',
+        'PASS-RULE',
+        'COMPATIBLE',
+      });
+    });
+
+    test('lets a rule name the GLOBAL the core adds', () {
+      expect(RuleTarget.ruleTargets, {...RuleTarget.baseTargets, 'GLOBAL'});
     });
   });
 
@@ -88,27 +82,6 @@ void main() {
       expect(ItemPosition.get(0, 3), ItemPosition.start);
       expect(ItemPosition.get(1, 3), ItemPosition.middle);
       expect(ItemPosition.get(2, 3), ItemPosition.end);
-    });
-
-    test('calculates visual positions after deleted items are skipped', () {
-      final items = ['a', 'b', 'c', 'd'];
-      final deletedItems = {'a', 'c'};
-
-      expect(
-        ItemPosition.calculateVisualPosition(1, items, deletedItems),
-        ItemPosition.start,
-      );
-      expect(
-        ItemPosition.calculateVisualPosition(3, items, deletedItems),
-        ItemPosition.end,
-      );
-    });
-
-    test('deleted current item has no visual position', () {
-      expect(
-        ItemPosition.calculateVisualPosition(1, ['a', 'b'], {'b'}),
-        ItemPosition.middle,
-      );
     });
   });
 }

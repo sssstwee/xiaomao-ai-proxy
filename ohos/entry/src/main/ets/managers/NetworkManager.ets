@@ -25,7 +25,7 @@ export default class NetworkManager {
     callback(Array.from(new Set(dnsList)).join(","))
   }
 
-  subscribe(callback: (s: string) => void): Promise<void> {
+  subscribe(callback: (s: string) => void, onNetworkChanged?: () => void): Promise<void> {
     if (this.subscription) return this.subscription
     // A fresh observer avoids accumulating handlers across VPN reconnects.
     const netConnection = connection.createNetConnection()
@@ -35,6 +35,7 @@ export default class NetworkManager {
         if (this.netConnection !== netConnection) return
         if (netHandle?.netId) {
           this.networkMap.set(netHandle.netId, new Network())
+          onNetworkChanged?.()
           this.handleNetworkUpdate(callback)
         }
       })
@@ -65,6 +66,7 @@ export default class NetworkManager {
         if (this.netConnection !== netConnection) return
         if (netHandle?.netId) {
           this.networkMap.delete(netHandle.netId)
+          onNetworkChanged?.()
           this.handleNetworkUpdate(callback)
         }
       })

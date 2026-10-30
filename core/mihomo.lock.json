@@ -3,11 +3,12 @@
   "upstreamCommit": "3f27ef39f8c96bbfbc8b0b9bb10f5c9ef60149d8",
   "flClashCommit": "c5062921054902b25215a6a933e72ccd714c9bfa",
   "patch": "patches/openharmony.patch",
-  "patchSha256": "9608729e92b58730e92376e2055d15d687a1f85c2f777e283316b5dc67d3bd66",
+  "patchSha256": "60844d640a3e0e9fdd34b614752ad6bf0ab5815ef3a5e048b96d7e9be165491e",
   "patchedFiles": {
     "constant/features/android.go": "c171fe10b2113f4d032392d30b1c834f2849cd0688d44352bc99313d5b89b405",
     "constant/features/android_stub.go": "d9072ab9111327380db85b61fc32ce73d4135dd27663bad456b29cec8ec59780",
     "dns/patch_openharmony.go": "1e6c31d7bbdaac20e07c244340aab8ac0b50766073ce30b4bbc422d8cd9682ce",
-    "dns/system_common.go": "11500d7ed60b4a556d35461860ac57035e8871ac8580565ee80ba4dfb04fa7c9"
+    "dns/system_common.go": "11500d7ed60b4a556d35461860ac57035e8871ac8580565ee80ba4dfb04fa7c9",
+    "rules/common/uid.go": "c7f7c50a3691067fdc413edb0c3b3ba661e3fa43c70e9b20522e0bf40a8894d0"
   }
 }

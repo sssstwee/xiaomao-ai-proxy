@@ -27,6 +27,7 @@ migrate_working_dir/
 **/doc/api/
 **/ios/Flutter/.last_build_id
 .dart_tool/
+/.widget_preview/
 .flutter-plugins
 .flutter-plugins-dependencies
 .packages
@@ -43,6 +44,7 @@ app.*.map.json
 
 # Claude Code - ignore user-specific settings only
 .claude/settings.local.json
+.claude/worktrees/
 
 # Documentation (generated/planning artifacts)
 docs/
@@ -56,6 +58,7 @@ docs/
 /android/**/build
 /android/common/**/.**/
 /android/common/local.*
+# Left in place by builds from before the gomobile Core.
 /android/core/**/includes/
 /android/core/**/cmake-build-*/
 /android/core/**/jniLibs/
@@ -67,30 +70,26 @@ docs/
 /macos/**/Package.resolved
 /macos/build/
 /env.json
-/env.local.json
-*.secrets.json
-**/private-config*.json
 /core_sha256.json
-/core/*.exe
 /plugins/rust_api/.claude/
+/issue-triage/
 devtools_options.yaml
 
 # FVM Version Cache
 .fvm/
 .fvmrc
+/coverage/lcov.info
 
-# Cloudflare local state and secrets
-backend/node_modules/
-backend/.wrangler/
-backend/.dev.vars*
-backend/.env*
-backend/wrangler.local.jsonc
+# Generated OHOS Go compatibility module; dependencies stay in core/go.mod.
+/core/.ohos.mod
+/core/.ohos.sum
 
-# Local editor / agent artifacts (not part of the HarmonyOS product)
-.mcp.json
-opencode.jsonc
-.codegraph/
-.gemini/
-.zed/
-release_telegram.py
-.github/homebrew_cask_template.rb
+# HarmonyOS native release intermediates
+/ohos/core/libs/
+/ohos/core/src/main/cpp/includes/
+/ohos/entry/libs/
+/plugins/rust_api/rust/target/
+/dist/
+
+# The OHOS SDK recreates this obsolete CocoaPods file on a macOS host.
+/macos/Podfile

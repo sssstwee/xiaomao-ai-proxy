@@ -3,21 +3,14 @@ import 'dart:io';
 
 import 'package:args/args.dart';
 import 'package:path/path.dart' as p;
-
-// Change only the downloadable filename. app_name also controls native binary
-// lookup and installation identity in the pinned distributor.
-const artifactNameTemplate =
-    'xiaomao-proxy-{{build_name}}-{{platform}}'
-    '{{#description}}-{{description}}{{/description}}'
-    '{{#is_installer}}-setup{{/is_installer}}'
-    '{{#ext}}.{{ext}}{{/ext}}';
+import 'package:yaml/yaml.dart';
 
 const _allTargets = <String, String>{
   'android': 'apk',
-  'linux': 'deb', // appimage + rpm added for amd64 only
+  'ohos': 'hap,app',
+  'linux': 'deb,appimage,rpm',
   'macos': 'dmg',
   'windows': 'exe,zip',
-  'ohos': 'hap,app',
 };
 
 const _androidFlutterTarget = {
@@ -62,8 +55,20 @@ Future<void> main(List<String> args) async {
 
   final env = results['env'] as String;
   final rootDir = Directory.current.path;
+  final skipped = packagesNotBuildingAssets(
+    File(p.join(rootDir, 'pubspec.yaml')).readAsStringSync(),
+  );
+  if (skipped.isNotEmpty) {
+    stderr.writeln(
+      'pubspec.yaml sets hooks.user_defines.<package>.build_assets: false '
+      'for ${skipped.join(', ')}; a package built this way would ship '
+      'whatever is left in libclash/ and no Rust library. '
+      'Restore "build_assets: true".',
+    );
+    exit(1);
+  }
   final arch = _detectArch();
-  final targets = _getTargets(platform, arch, results['targets']);
+  final targets = createPackageTargets(platform, results['targets']);
   final androidArch = results['arch'] as String?;
   final verbose = results['verbose'] as bool;
 
@@ -84,12 +89,12 @@ ArgParser createSetupArgParser() {
     ..addOption(
       'env',
       defaultsTo: 'pre',
-      allowed: ['pre', 'stable'],
+      allowed: ['dev', 'pre', 'stable'],
       help: 'Application environment',
     )
     ..addOption(
       'targets',
-      valueHelp: 'exe,zip,dmg,apk,hap,app,...',
+      valueHelp: 'exe,zip,dmg,apk,...',
       help: 'Package targets (default: all for platform)',
     )
     ..addOption(
@@ -117,21 +122,32 @@ List<String> createFlutterBuildArgs({
   if (platform == 'android') {
     flutterBuildArgs.add('split-per-abi');
   }
-  if (platform == 'ohos') {
-    flutterBuildArgs.add('no-codesign');
-  }
   return flutterBuildArgs;
 }
 
-String _getTargets(String platform, String arch, String? customTargets) {
-  if (customTargets != null) return customTargets;
-  if (platform == 'linux' && arch == 'amd64') return 'deb,appimage,rpm';
-  return _allTargets[platform]!;
+Map<String, String> createBuildEnvironment(String env) {
+  return {'APP_ENV': env};
+}
+
+/// Packages whose build hook `pubspec.yaml` turns into a no-op.
+List<String> packagesNotBuildingAssets(String pubspec) {
+  final document = loadYaml(pubspec);
+  if (document is! Map) return const [];
+  final defines = (document['hooks'] as Map?)?['user_defines'];
+  if (defines is! Map) return const [];
+  return [
+    for (final MapEntry(:key, :value) in defines.entries)
+      if (value is Map && value['build_assets'] == false) key.toString(),
+  ]..sort();
+}
+
+String createPackageTargets(String platform, String? customTargets) {
+  return customTargets ?? _allTargets[platform]!;
 }
 
 void _showHelp(ArgParser parser) {
   stderr.writeln('Usage: dart setup.dart [platform] [options]');
-  stderr.writeln('Platform: current host platform (default) or android');
+  stderr.writeln('Platform: current host platform (default), android or ohos');
   stderr.writeln();
   stderr.writeln('Default package targets:');
   _allTargets.forEach((p, t) => stderr.writeln('  $p: $t'));
@@ -148,28 +164,23 @@ Future<int> _package(
   String? androidArch,
   required bool verbose,
 }) async {
-  final coreSha256 = platform == 'windows' ? await _buildGoCore(rootDir) : null;
-
   final file = File(p.join(rootDir, 'env.json'));
-  final defines = await file.exists()
-      ? jsonDecode(await file.readAsString()) as Map<String, dynamic>
-      : <String, dynamic>{};
-  defines.remove('CORE_SHA256');
+  await file.writeAsString(jsonEncode(createBuildEnvironment(env)));
 
-  await file.writeAsString(
-    jsonEncode({...defines, 'APP_ENV': env, 'CORE_SHA256': ?coreSha256}),
-  );
+  if (platform == 'ohos') {
+    return _packageOhos(rootDir, targets, verbose: verbose);
+  }
 
   final flutterBuildArgs = createFlutterBuildArgs(
     platform: platform,
     verbose: verbose,
   );
   final descriptionArgs = <String>[];
-  if (platform != 'android' && platform != 'ohos') {
+  if (platform != 'android') {
     descriptionArgs.addAll(['--description', arch]);
   }
 
-  final depExit = await _ensureDependencies(platform, arch);
+  final depExit = await _ensureDependencies(platform);
   if (depExit != 0) return depExit;
 
   final activateResult = await Process.run('dart', [
@@ -178,9 +189,9 @@ Future<int> _package(
     'activate',
     '-s',
     'git',
-    'https://github.com/tljk/flutter_distributor.git',
+    'https://github.com/chen08209/flutter_distributor.git',
     '--git-ref',
-    'FlClash',
+    'v0.6.11-flclash.4',
     '--git-path',
     'packages/flutter_distributor',
   ]);
@@ -198,8 +209,6 @@ Future<int> _package(
       platform,
       '--targets',
       targets,
-      '--artifact-name',
-      artifactNameTemplate,
       if (androidArch != null)
         '--build-target-platform=${_androidFlutterTarget[androidArch]!}',
       if (flutterBuildArgs.isNotEmpty)
@@ -207,7 +216,6 @@ Future<int> _package(
       ...descriptionArgs,
     ],
     includeParentEnvironment: true,
-    environment: {'ANDROID_ARCH': ?androidArch},
     runInShell: Platform.isWindows,
   );
 
@@ -221,30 +229,107 @@ Future<int> _package(
   return exitCode;
 }
 
-Future<String?> _buildGoCore(String rootDir) async {
-  final buildToolDir = p.join(
-    rootDir,
-    'plugins',
-    'setup',
-    'buildkit',
-    'build_tool',
-  );
-  final result = await Process.run('dart', [
-    'run',
-    'build_tool',
-    'windows',
-    '--root-dir',
-    rootDir,
-  ], workingDirectory: buildToolDir);
-  if (result.exitCode != 0) {
-    stderr.write(result.stderr);
-    return null;
+Future<int> _packageOhos(
+  String rootDir,
+  String targets, {
+  required bool verbose,
+}) async {
+  final requested = targets.split(',').toSet();
+  if (requested.isEmpty ||
+      requested.any((target) => !{'hap', 'app'}.contains(target))) {
+    stderr.writeln('OHOS package targets must be hap and/or app.');
+    return 64;
   }
-  final shaFile = File(p.join(rootDir, 'core_sha256.json'));
-  if (!shaFile.existsSync()) return null;
-  final content =
-      jsonDecode(shaFile.readAsStringSync()) as Map<String, dynamic>;
-  return content['CORE_SHA256'] as String?;
+  final environment = {'FLCLASH_OHOS_BUILD': '1'};
+  final commands = <(String, List<String>)>[
+    ('dart', ['plugins/setup/setup_hooks/bin/build_ohos.dart', rootDir]),
+    ('bash', ['plugins/rust_api/tool/ohos_rust.sh', 'build']),
+  ];
+  for (final (executable, arguments) in commands) {
+    final result = await _runOhosCommand(
+      executable,
+      arguments,
+      rootDir,
+      environment,
+    );
+    if (result != 0) return result;
+  }
+  final rustLibrary = File(
+    p.join(
+      rootDir,
+      'plugins',
+      'rust_api',
+      'rust',
+      'target',
+      'aarch64-unknown-linux-ohos',
+      'release',
+      'librust_api.so',
+    ),
+  );
+  final nativeDirectory = Directory(
+    p.join(rootDir, 'ohos', 'entry', 'libs', 'arm64-v8a'),
+  );
+  await nativeDirectory.create(recursive: true);
+  await rustLibrary.copy(p.join(nativeDirectory.path, 'librust_api.so'));
+
+  for (final target in requested) {
+    final result = await _runOhosCommand(
+      'flutter',
+      [
+        if (verbose) '-v',
+        'build',
+        target,
+        '--release',
+        '--no-codesign',
+        '--dart-define-from-file=env.json',
+      ],
+      rootDir,
+      environment,
+    );
+    if (result != 0) return result;
+  }
+  final version =
+      (loadYaml(File(p.join(rootDir, 'pubspec.yaml')).readAsStringSync())
+          as Map)['version'];
+  final dist = Directory(p.join(rootDir, 'dist'));
+  await dist.create(recursive: true);
+  for (final target in requested) {
+    final candidates = Directory(p.join(rootDir, 'ohos'))
+        .listSync(recursive: true, followLinks: false)
+        .whereType<File>()
+        .where(
+          (file) =>
+              file.path.endsWith('-unsigned.$target') &&
+              file.path.contains('${p.separator}outputs${p.separator}'),
+        )
+        .toList();
+    if (candidates.length != 1) {
+      stderr.writeln(
+        'Expected one unsigned $target, found ${candidates.length}.',
+      );
+      return 1;
+    }
+    await candidates.single.copy(
+      p.join(dist.path, 'xiaomao-proxy-$version-arm64.$target'),
+    );
+  }
+  return 0;
+}
+
+Future<int> _runOhosCommand(
+  String executable,
+  List<String> arguments,
+  String rootDir,
+  Map<String, String> environment,
+) async {
+  final process = await Process.start(
+    executable,
+    arguments,
+    workingDirectory: rootDir,
+    environment: environment,
+    mode: ProcessStartMode.inheritStdio,
+  );
+  return process.exitCode;
 }
 
 String _detectArch() {
@@ -266,12 +351,12 @@ Future<bool> _hasCommand(String cmd) async {
   return result.exitCode == 0;
 }
 
-Future<int> _ensureDependencies(String platform, String arch) async {
+Future<int> _ensureDependencies(String platform) async {
   switch (platform) {
     case 'macos':
       return _ensureMacosDependencies();
     case 'linux':
-      return _ensureLinuxDependencies(arch);
+      return _ensureLinuxDependencies();
     default:
       return 0;
   }
@@ -290,19 +375,15 @@ Future<int> _ensureMacosDependencies() async {
   return result.exitCode;
 }
 
-Future<int> _ensureLinuxDependencies(String arch) async {
-  final pkgGroups = <List<String>>[
+Future<int> _ensureLinuxDependencies() async {
+  const pkgGroups = <List<String>>[
     ['ninja-build', 'libgtk-3-dev'],
     ['libayatana-appindicator3-dev'],
-    ['libkeybinder-3.0-dev'],
+    ['libsecret-1-dev'],
     ['locate'],
+    ['rpm', 'patchelf'],
+    ['libfuse2'],
   ];
-  if (arch == 'amd64') {
-    pkgGroups.addAll([
-      ['rpm', 'patchelf'],
-      ['libfuse2'],
-    ]);
-  }
 
   final missingGroups = <List<String>>[];
   for (final group in pkgGroups) {
@@ -342,33 +423,45 @@ Future<int> _ensureLinuxDependencies(String arch) async {
     }
   }
 
-  if (arch == 'amd64') {
-    const appimagetool = '/usr/local/bin/appimagetool';
-    if (File(appimagetool).existsSync()) {
-      stdout.writeln('appimagetool already installed, skipping.');
-      return 0;
-    }
-    stdout.writeln('Downloading appimagetool...');
-    final downloadName = arch == 'amd64' ? 'x86_64' : 'aarch64';
-    final dlResult = await Process.run('wget', [
-      '-O',
-      appimagetool,
-      'https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-$downloadName.AppImage',
-    ]);
-    if (dlResult.exitCode != 0) {
-      stderr.write(dlResult.stderr);
-      return dlResult.exitCode;
-    }
-    await Process.run('chmod', ['+x', appimagetool]);
+  const appimagetool = '/usr/local/bin/appimagetool';
+  if (File(appimagetool).existsSync()) {
+    stdout.writeln('appimagetool already installed, skipping.');
+    return 0;
   }
-
+  stdout.writeln('Downloading appimagetool...');
+  final downloadName =
+      'appimagetool-${appImageToolArch(_detectArch())}.AppImage';
+  final dlResult = await Process.run('wget', [
+    '-O',
+    appimagetool,
+    'https://github.com/AppImage/AppImageKit/releases/download/continuous/$downloadName',
+  ]);
+  if (dlResult.exitCode != 0) {
+    stderr.write(dlResult.stderr);
+    return dlResult.exitCode;
+  }
+  await Process.run('chmod', ['+x', appimagetool]);
   return 0;
 }
 
+String appImageToolArch(String arch) {
+  return arch == 'arm64' ? 'aarch64' : 'x86_64';
+}
+
+/// Ubuntu 24.04 ships libfuse2 under its time64 name, which `dpkg -s libfuse2` cannot see.
+const _debianPackageAliases = <String, List<String>>{
+  'libfuse2': ['libfuse2t64'],
+};
+
 Future<bool> _isDebianPackageInstalled(String pkg) async {
-  final result = await Process.run('dpkg', ['-s', pkg]);
-  return result.exitCode == 0 &&
-      (result.stdout as String).contains('Status: install ok installed');
+  for (final name in [pkg, ...?_debianPackageAliases[pkg]]) {
+    final result = await Process.run('dpkg', ['-s', name]);
+    if (result.exitCode == 0 &&
+        (result.stdout as String).contains('Status: install ok installed')) {
+      return true;
+    }
+  }
+  return false;
 }
 
 Future<bool> _areDebianPackagesInstalled(List<String> pkgs) async {

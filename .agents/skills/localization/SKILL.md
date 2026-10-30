@@ -7,38 +7,44 @@ description: Use when changing FlClash UI text, scanning for hardcoded Chinese s
 
 ## When To Use
 
-Use this for localization work inside `/Users/Shared/follow/FlClash`, especially hardcoded UI text in `lib/`, ARB updates, missing translations, or generated `lib/l10n/` output that does not match source ARB values.
+Use this for localization work in this repository, especially hardcoded UI text in `lib/`, ARB updates, missing translations, or generated `lib/l10n/` output that does not match source ARB values.
 
 Do not use this for README translation sync or manual edits to generated localization Dart.
 
 ## Workflow
 
-1. Confirm `pubspec.yaml` still uses `flutter_intl`, source ARBs under `arb/`, and generated output under `lib/l10n/`.
-2. Scan user-facing Dart text before opening many files:
+1. Scan user-facing Dart text before opening many files. `flutter_intl` reads `arb/` and writes `lib/l10n/`:
 
    ```bash
    rg -n "[\\p{Han}]" lib -g '!lib/l10n/intl/**' -g '!lib/**/generated/**'
    ```
 
-3. Inspect the smallest relevant call sites and nearby ARB keys.
-4. Add or update every source ARB:
+2. Inspect the smallest relevant call sites and nearby ARB keys.
+3. Add or update every source ARB:
    - `arb/intl_en.arb`
    - `arb/intl_zh_CN.arb`
-   This app supports only English and Chinese. Do not add other locale ARBs.
-5. Replace inline strings with existing project accessors:
-   - Widgets with `BuildContext`: `context.appLocalizations.key` from `common.dart`.
-   - Controllers/providers/non-widget code: `currentAppLocalizations.key` from `app_localizations.dart`.
-6. Regenerate:
+   - `arb/intl_ja.arb`
+   - `arb/intl_ru.arb`
+   - `arb/intl_fr.arb`
+   - `arb/intl_es.arb`
+   - `arb/intl_ko.arb`
+4. Replace inline strings with existing project accessors:
+   - Widgets with `BuildContext`: `context.appLocalizations.key` from `lib/common/context.dart`.
+   - Controllers/providers/non-widget code: `currentAppLocalizations.key` from `lib/common/app_localizations.dart`.
+5. Regenerate:
 
    ```bash
    dart run intl_utils:generate
    ```
 
-7. Verify changed Dart files with `flutter analyze` when practical.
-8. Re-run the Han-text scan for targeted strings.
+6. Run `flutter analyze --no-fatal-infos` and `flutter test test/l10n test/lint/dynamic_message_key_test.dart`. The
+   lint test checks that every locale carries the same keys and that no `Intl.message` builds a key at runtime; labels
+   for enum values go through the switches in `lib/common/l10n_labels.dart`, as the ARB section of `.agents/rules.md`
+   explains.
+7. Re-run the Han-text scan for targeted strings.
 
 ## Pitfalls
 
-- Keep the generated supported locales in sync with the English and Chinese source ARBs. Remove obsolete locale resources when removing a language; do not edit generated Dart by hand.
+- A locale that still shows English lacks the key or carries an English value in its source ARB; fix that ARB and
+  regenerate. Do not edit generated Dart.
 - Ignore `lib/l10n/intl/**` and `lib/**/generated/**` during text scans.
-- If generator or analyzer hits local cache permission friction, rerun serially before treating it as a code issue.

@@ -1,10 +1,10 @@
-export const invokeAction: (onResult: (data: string) => void, parasChar: string) => void;
-export const startTUN: (protect: (fd: number) => Promise<void>, resolverProcess: (protocol: number, source: string, target: string, uid: number) => string, fd: number, stackChar: string, addressChar: string, dnsChar: string) => boolean;
+export const invokeMethod: (onResult: (data: string) => void, paramsChar: string) => void;
+export const startTUN: (protect: (fd: number) => Promise<void>, resolveUid: (protocol: number, source: string, target: string) => number, resolvePackage: (uid: number) => string, fd: number, stackChar: string, addressChar: string, dnsChar: string, optionsChar: string) => boolean;
 export const quickSetup: (onResult: (data: string) => void, initParamsChar: string, setupParamsChar: string) => void;
 export const setEventListener: (listener?: (data: string) => void) => void;
 export const getTotalTraffic: (onlyStatisticsProxy: boolean) => string;
 export const getTraffic: (onlyStatisticsProxy: boolean) => string;
 export const stopTun: () => Promise<void>;
-export const suspend: (suspended: boolean) => void;
 export const forceGC: () => void;
 export const updateDns: (s: string) => void;
+export const resetNetwork: () => void;
