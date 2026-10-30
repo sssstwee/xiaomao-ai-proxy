@@ -140,7 +140,7 @@ jobs:
           printf '%s  %s\n' "$OHOS_GO_ARCHIVE_SHA256" "$OHOS_GO_ARCHIVE" | sha256sum --check
           mkdir -p "$OHOS_GO_DIR"
           tar -xzf "$OHOS_GO_ARCHIVE" -C "$OHOS_GO_DIR" --strip-components=1
-          test "$(cat "$OHOS_GO_DIR/VERSION")" = 'go1.27.2-ohos'
+          test "$(head -n 1 "$OHOS_GO_DIR/VERSION")" = 'go1.27.2-ohos'
           export GOROOT="$OHOS_GO_DIR"
           export GOTOOLCHAIN=local
           "$OHOS_GO_DIR/bin/go" version
