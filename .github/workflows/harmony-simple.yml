@@ -1,7 +1,4 @@
-name: CC保镖 HarmonyOS
-
-# Package only HarmonyOS/OHOS, through an authorized manual run on main.
-# Pushes and pull requests validate code without producing client packages.
+name: 小猫代理 HarmonyOS
 
 on:
   push:
@@ -11,192 +8,136 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: harmony-simple-${{ github.event_name }}-${{ github.ref }}
+  group: harmony-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
 
 permissions:
   contents: read
 
 jobs:
-  secrets-scan:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v4
-      - name: Check for committed secrets
-        run: bash .github/scripts/check-no-secrets.sh
-
-  changes:
-    permissions:
-      contents: read
-      pull-requests: read
-    runs-on: ubuntu-latest
-    outputs:
-      backend: ${{ steps.filter.outputs.backend }}
-      app: ${{ steps.filter.outputs.app }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v3
-        id: filter
-        with:
-          filters: |
-            backend:
-              - 'backend/**'
-            app:
-              - '**'
-              - '!backend/**'
-
-  backend:
-    needs: [changes, secrets-scan]
-    if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.backend == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    defaults:
-      run:
-        working-directory: backend
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: npm
-          cache-dependency-path: backend/package-lock.json
-      - run: npm ci
-      - run: npm run check
-
   build:
-    needs: [changes, backend, secrets-scan]
-    if: |
-      !cancelled() &&
-      needs.changes.result == 'success' &&
-      needs.secrets-scan.result == 'success' &&
-      (needs.backend.result == 'success' || needs.backend.result == 'skipped') &&
-      (github.event_name == 'workflow_dispatch' || needs.changes.outputs.app == 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
-
-      - name: Load pinned gitcode SHAs
+          fetch-depth: 0
+      - name: Check for committed secrets
+        run: |
+          bash .github/scripts/check-no-secrets.sh
+          python3 -m unittest discover -s test/ci
+          bash tool/hooks/test.sh
+      - name: Load pinned toolchains
         run: grep -v '^#' .github/harmony-pinned-shas.env >> "$GITHUB_ENV"
-
       - name: Set up HarmonyOS SDK
         uses: ErBWs/setup-ohos@v2.0.0
         with:
           version: 26.0.0.821
           cache: true
-
-      - name: Set up HarmonyOS Flutter
+      - name: Set up HarmonyOS Flutter 3.47.7
         run: |
           set -euo pipefail
           FLUTTER_DIR="$RUNNER_TOOL_CACHE/flutter-ohos"
-          rm -rf "$FLUTTER_DIR"
-          mkdir -p "$FLUTTER_DIR"
-          git -C "$FLUTTER_DIR" init
+          git init "$FLUTTER_DIR"
           git -C "$FLUTTER_DIR" remote add origin https://gitcode.com/CPF-Flutter/flutter_flutter.git
           git -C "$FLUTTER_DIR" fetch --depth 1 origin "$FLUTTER_OHOS_SHA"
           git -C "$FLUTTER_DIR" checkout FETCH_HEAD
-          git -C "$FLUTTER_DIR" tag 3.44.10
+          git -C "$FLUTTER_DIR" tag 3.47.7+ohos-0.0.1-pre
           git -C "$FLUTTER_DIR" apply "$GITHUB_WORKSPACE/.github/flutter_ohos.patch"
           echo "$FLUTTER_DIR/bin" >> "$GITHUB_PATH"
           echo "$FLUTTER_DIR/bin/cache/dart-sdk/bin" >> "$GITHUB_PATH"
-          echo "$HOME/.pub-cache/bin" >> "$GITHUB_PATH"
-
-      - name: Cache Dart dependencies
-        uses: actions/cache@v4
+      - uses: actions/cache@v4
         with:
           path: ~/.pub-cache
-          key: harmony-flutter-3.44.10-${{ runner.os }}-${{ hashFiles('**/pubspec.lock') }}
-          restore-keys: harmony-flutter-3.44.10-${{ runner.os }}-
-
-      - name: Install dependencies
+          key: harmony-flutter-3.47.7-${{ runner.os }}-${{ hashFiles('**/pubspec.lock') }}
+          restore-keys: harmony-flutter-3.47.7-${{ runner.os }}-
+      - name: Disable client build hooks for validation
+        run: |
+          sed -i 's/build_assets: true/build_assets: false/g' pubspec.yaml
+      - name: Resolve dependencies
         env:
           GIT_CONFIG_COUNT: '1'
           GIT_CONFIG_KEY_0: http.version
           GIT_CONFIG_VALUE_0: HTTP/1.1
         run: flutter pub get
-
-      - name: Install icon renderer
-        run: sudo apt-get update && sudo apt-get install -y librsvg2-bin
-
       - name: Generate Dart sources
         run: |
-          dart format lib/common/atomic_profile.dart lib/common/app_localizations.dart lib/state.dart lib/views/tools.dart test/common/atomic_profile_test.dart lib/common/harmony_account.dart lib/common/auto_proxy.dart lib/providers/harmony_simple.dart lib/providers/action.dart lib/providers/database.dart lib/models/profile.dart lib/views/dashboard/simple.dart test/common/harmony_account_test.dart test/common/auto_proxy_test.dart test/providers/harmony_simple_test.dart test/widgets/simple_dashboard_test.dart test/common/harmony_localization_test.dart test/tool/generate_app_icon_test.dart tool/generate_app_icon.dart
           dart run intl_utils:generate
           dart run build_runner build --delete-conflicting-outputs
-          dart run tool/generate_app_icon.dart
-
-      - name: Check generated Dart sources and formatting
-        run: |
-          # PNG encoding varies by SVG renderer; rendered icon layers are verified in tests.
-          git diff --exit-code -- lib test tool
-
+          git diff --exit-code -- lib/l10n lib/models/generated lib/providers/generated lib/database/generated
       - name: Analyze
         run: flutter analyze --no-fatal-infos
-
-      - name: Test
-        run: flutter test --reporter expanded
-
-      - name: Set up Go bootstrap
-        if: github.head_ref != 'codex/harmony-audit-fixes-github' && github.ref_name != 'codex/harmony-audit-fixes-github'
-        uses: actions/setup-go@v5
+      - name: Flutter tests without compiling client libraries
+        run: python3 tool/test_without_native_rust.py
+      - name: Test HarmonyOS file picker
+        run: flutter test --no-pub plugins/file_picker_ohos/test --reporter expanded
+      - name: Test HarmonyOS VPN lifecycle
+        run: node --test test/native/harmony_vpn_test.cjs
+      - uses: actions/setup-go@v5
         with:
           go-version: '1.26.4'
           cache-dependency-path: core/go.sum
-
-      - name: Test core health checks
-        if: github.head_ref != 'codex/harmony-audit-fixes-github' && github.ref_name != 'codex/harmony-audit-fixes-github'
+      - name: Prepare pinned Mihomo sources
+        run: |
+          dart core/prepare_mihomo.dart
+          dart core/prepare_ohos_modfile.dart
+      - name: Test Go core with HarmonyOS-compatible compiler
         working-directory: core
         env:
           CGO_ENABLED: '0'
-        run: go test -mod=mod -run 'Test(DelayHonorsConfiguredHTTPStatus|SubscriptionProxy)' -count=1 .
-
-      - name: Set up HarmonyOS Go
+          GOTOOLCHAIN: local
+        run: |
+          go test -mod=readonly -modfile=.ohos.mod -tags=with_gvisor ./...
+          go test -mod=readonly -modfile=.ohos.mod -tags='with_gvisor openharmony' . ./tun ./platform
+          go vet -mod=readonly -modfile=.ohos.mod -tags=with_gvisor ./...
+          go vet -mod=readonly -modfile=.ohos.mod -tags='with_gvisor openharmony' . ./tun ./platform
+      - name: Restore verified upstream sources
+        run: dart core/prepare_mihomo.dart --reverse
+      - name: Test build harness with the pinned root dependencies
+        run: dart run test:test plugins/setup/setup_hooks/test --reporter expanded
+      - name: Set up Rust
+        run: rustup toolchain install 1.92.0 --profile minimal --component rustfmt --target aarch64-unknown-linux-ohos
+      - name: Check Rust HarmonyOS target
+        env:
+          RUSTUP_TOOLCHAIN: '1.92.0'
+        run: bash plugins/rust_api/tool/ohos_rust.sh check
+      - name: Test Rust library algorithms
+        env:
+          RUSTUP_TOOLCHAIN: '1.92.0'
+        run: cargo test --locked --manifest-path plugins/rust_api/rust/Cargo.toml --lib
+      - name: Set up HarmonyOS Go for authorized package run
         if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
         run: |
           set -euo pipefail
           OHOS_GO_DIR="$RUNNER_TOOL_CACHE/ohos-go"
-          rm -rf "$OHOS_GO_DIR"
-          mkdir -p "$OHOS_GO_DIR"
-          git -C "$OHOS_GO_DIR" init
+          git init "$OHOS_GO_DIR"
           git -C "$OHOS_GO_DIR" remote add origin https://gitcode.com/openharmony-sig/ohos_golang_go.git
           git -C "$OHOS_GO_DIR" fetch --depth 1 origin "$OHOS_GO_SHA"
           git -C "$OHOS_GO_DIR" checkout FETCH_HEAD
-          git -C "$OHOS_GO_DIR" log -1 --format='OHOS Go commit: %H %s'
           cd "$OHOS_GO_DIR/src"
           ./make.bash
           echo "GOROOT=$OHOS_GO_DIR" >> "$GITHUB_ENV"
           echo "$OHOS_GO_DIR/bin" >> "$GITHUB_PATH"
-
       - name: Build unsigned HarmonyOS packages
         if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+        env:
+          RUSTUP_TOOLCHAIN: '1.92.0'
         run: |
-          set -euo pipefail
-          # Private subscription URLs are configured on the device.
-          cp env.json.example env.json
           dart setup.dart ohos --env stable -v
-
       - name: Checksums
         if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
         run: |
           cd dist
-          find . -type f \( -name '*.hap' -o -name '*.app' \) -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
-
-      - name: Resolve package artifact name
-        if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
-        id: pkg
-        run: echo "name=cc-bodyguard-HarmonyOS-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
-
+          sha256sum -- *.hap *.app > SHA256SUMS
       - name: Upload packages
         if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ steps.pkg.outputs.name }}
+          name: xiaomao-proxy-HarmonyOS-${{ github.sha }}
           path: |
-            dist/**/*.hap
-            dist/**/*.app
+            dist/*.hap
+            dist/*.app
             dist/SHA256SUMS
           if-no-files-found: error
           retention-days: 14
@@ -212,7 +153,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          name: cc-bodyguard-HarmonyOS-${{ github.sha }}
+          name: xiaomao-proxy-HarmonyOS-${{ github.sha }}
           path: release-input
 
       - name: Prepare verified release assets
@@ -245,7 +186,7 @@ jobs:
         uses: softprops/action-gh-release@v3.0.3
         with:
           tag_name: ${{ steps.release.outputs.tag }}
-          name: CC保镖 ${{ steps.release.outputs.version }}
+          name: 小猫代理 ${{ steps.release.outputs.version }}
           target_commitish: ${{ github.sha }}
           make_latest: true
           fail_on_unmatched_files: true

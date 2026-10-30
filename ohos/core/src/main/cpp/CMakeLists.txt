@@ -16,10 +16,10 @@ endif ()
 set(LIB_CLASH_PATH "${CMAKE_SOURCE_DIR}/../../../libs/${OHOS_ARCH}/libclash.so")
 set(LIB_CLASH_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/../cpp/includes/${OHOS_ARCH}")
 set(LIB_CLASH_HEADER_PATH "${LIB_CLASH_INCLUDE_DIR}/libclash.h")
-set(BRIDE_HEADER_PATH "${LIB_CLASH_INCLUDE_DIR}/bride.h")
+set(BRIDGE_HEADER_PATH "${LIB_CLASH_INCLUDE_DIR}/bridge.h")
 
 message("LIB_CLASH_PATH ${LIB_CLASH_PATH}")
-if (EXISTS ${LIB_CLASH_PATH} AND EXISTS ${LIB_CLASH_HEADER_PATH} AND EXISTS ${BRIDE_HEADER_PATH})
+if (EXISTS ${LIB_CLASH_PATH} AND EXISTS ${LIB_CLASH_HEADER_PATH} AND EXISTS ${BRIDGE_HEADER_PATH})
     message("Found libclash.so and headers for ABI ${OHOS_ARCH}")
     add_compile_definitions(LIBCLASH)
     include_directories(${LIB_CLASH_INCLUDE_DIR})
@@ -30,8 +30,5 @@ if (EXISTS ${LIB_CLASH_PATH} AND EXISTS ${LIB_CLASH_HEADER_PATH} AND EXISTS ${BR
             libace_napi.z.so
             clash)
 else ()
-    message("Not found complete libclash output for ABI ${OHOS_ARCH}; building core without LIBCLASH")
-    add_library(${CMAKE_PROJECT_NAME} SHARED
-            napi_init.cpp)
-    target_link_libraries(${CMAKE_PROJECT_NAME})
+    message(FATAL_ERROR "Missing verified OHOS libclash library or C ABI headers for ${OHOS_ARCH}")
 endif ()

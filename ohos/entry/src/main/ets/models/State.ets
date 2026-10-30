@@ -24,6 +24,8 @@ export class VpnOptions {
   bypassDomain: string[] = []
   stack: string = ""
   routeAddress: string[] = []
+  mtu: number = 0
+  congestionController: string = ''
 
   constructor() {
   }
@@ -32,6 +34,7 @@ export class VpnOptions {
 export class SetupParams {
   'test-url': string = ""
   'selected-map': Record<string, string> = {}
+  'skip-cert-verify': boolean = false
 
   constructor() {
   }
@@ -40,10 +43,11 @@ export class SetupParams {
 export class State {
   startTip: string = "Starting VPN..."
   stopTip: string = "Stopping VPN..."
-  crashlytics: boolean = true
-  currentProfileName: string = "CC保镖"
+  localNetworkTip: string = ''
+  currentProfileName: string = "小猫代理"
   stopText: string = "Stop"
   onlyStatisticsProxy: boolean = false
+  showStopAction: boolean = true
   vpnOptions: VpnOptions | null = null
   setupParams: SetupParams | null = null
 

@@ -2,7 +2,63 @@
   "string": [
     {
       "name": "widget_desc",
-      "value": "No need to add to home screen.\nJust exit this page."
+      "value": "Show connection status and open Xiaomao Proxy"
+    },
+    {
+      "name": "module_desc",
+      "value": "Xiaomao Proxy client"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "Xiaomao Proxy main screen"
+    },
+    {
+      "name": "TempAbility_desc",
+      "value": "Keep the proxy connected in the background"
+    },
+    {
+      "name": "permission_reason_internet",
+      "value": "Download subscriptions and rules and establish proxy connections"
+    },
+    {
+      "name": "permission_reason_read_media",
+      "value": "Read a selected QR-code image to import a profile"
+    },
+    {
+      "name": "permission_reason_write_media",
+      "value": "Save a profile exported by the user"
+    },
+    {
+      "name": "permission_reason_camera",
+      "value": "Scan QR codes to import subscriptions or profiles"
+    },
+    {
+      "name": "permission_reason_get_wifi_info",
+      "value": "Identify the current Wi-Fi network for on-demand connection settings"
+    },
+    {
+      "name": "permission_reason_read_pasteboard",
+      "value": "Read a subscription link from the clipboard to import a profile"
+    },
+    {
+      "name": "permission_reason_keep_background_running_system",
+      "value": "Maintain background proxy connections when allowed by the system"
+    },
+    {
+      "name": "permission_reason_keep_background_running",
+      "value": "Maintain the background proxy connection and display its running notification"
+    },
+    {
+      "name": "permission_reason_get_network_info",
+      "value": "Detect network changes and restore proxy connections"
+    },
+    {
+      "name": "permission_reason_use_fraud_app_picker",
+      "value": "Select installed apps for per-app proxy routing"
+    },
+    {
+      "name": "widget_display_name",
+      "value": "小猫代理"
     }
   ]
 }

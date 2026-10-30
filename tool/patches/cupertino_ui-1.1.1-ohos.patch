@@ -1,0 +1,171 @@
+diff --git a/lib/src/adaptive_text_selection_toolbar.dart b/lib/src/adaptive_text_selection_toolbar.dart
+--- a/lib/src/adaptive_text_selection_toolbar.dart
++++ b/lib/src/adaptive_text_selection_toolbar.dart
+@@ -193,6 +193,7 @@
+     List<ContextMenuButtonItem> buttonItems,
+   ) {
+     switch (defaultTargetPlatform) {
++      case TargetPlatform.ohos:
+       case TargetPlatform.android:
+       case TargetPlatform.fuchsia:
+       case TargetPlatform.iOS:
+@@ -219,6 +220,7 @@
+         children ?? getAdaptiveButtons(context, buttonItems!).toList();
+ 
+     switch (defaultTargetPlatform) {
++      case TargetPlatform.ohos:
+       case TargetPlatform.android:
+       case TargetPlatform.iOS:
+       case TargetPlatform.fuchsia:
+diff --git a/lib/src/app.dart b/lib/src/app.dart
+--- a/lib/src/app.dart
++++ b/lib/src/app.dart
+@@ -506,6 +506,7 @@
+       case TargetPlatform.windows:
+         assert(details.controller != null);
+         return CupertinoScrollbar(controller: details.controller, child: child);
++      case TargetPlatform.ohos:
+       case TargetPlatform.android:
+       case TargetPlatform.fuchsia:
+       case TargetPlatform.iOS:
+diff --git a/lib/src/button.dart b/lib/src/button.dart
+--- a/lib/src/button.dart
++++ b/lib/src/button.dart
+@@ -313,7 +313,7 @@
+   static double tapMoveSlop() {
+     return switch (defaultTargetPlatform) {
+       TargetPlatform.iOS ||
+-      TargetPlatform.android ||
++      TargetPlatform.ohos || TargetPlatform.android ||
+       TargetPlatform.fuchsia => kCupertinoButtonTapMoveSlop,
+       TargetPlatform.macOS || TargetPlatform.linux || TargetPlatform.windows => 0.0,
+     };
+diff --git a/lib/src/checkbox.dart b/lib/src/checkbox.dart
+--- a/lib/src/checkbox.dart
++++ b/lib/src/checkbox.dart
+@@ -438,7 +438,7 @@
+         widget.tapTargetSize ??
+         switch (defaultTargetPlatform) {
+           TargetPlatform.iOS ||
+-          TargetPlatform.android ||
++          TargetPlatform.ohos || TargetPlatform.android ||
+           TargetPlatform.fuchsia => const Size.square(kMinInteractiveDimensionCupertino),
+           TargetPlatform.macOS ||
+           TargetPlatform.linux ||
+diff --git a/lib/src/dialog.dart b/lib/src/dialog.dart
+--- a/lib/src/dialog.dart
++++ b/lib/src/dialog.dart
+@@ -1667,6 +1667,7 @@
+   void _emitVibration() {
+     switch (defaultTargetPlatform) {
+       case TargetPlatform.iOS:
++      case TargetPlatform.ohos:
+       case TargetPlatform.android:
+         HapticFeedback.selectionClick();
+       case TargetPlatform.fuchsia:
+@@ -2176,6 +2177,7 @@
+   void _emitVibration() {
+     switch (defaultTargetPlatform) {
+       case TargetPlatform.iOS:
++      case TargetPlatform.ohos:
+       case TargetPlatform.android:
+         HapticFeedback.selectionClick();
+       case TargetPlatform.fuchsia:
+diff --git a/lib/src/expansion_tile.dart b/lib/src/expansion_tile.dart
+--- a/lib/src/expansion_tile.dart
++++ b/lib/src/expansion_tile.dart
+@@ -185,6 +185,7 @@
+         semanticsHint = _tileController.isExpanded
+             ? '${localizations.collapsedHint}\n ${localizations.expansionTileExpandedHint}'
+             : '${localizations.expandedHint}\n ${localizations.expansionTileCollapsedHint}';
++      case TargetPlatform.ohos:
+       case TargetPlatform.android:
+       case TargetPlatform.fuchsia:
+       case TargetPlatform.linux:
+diff --git a/lib/src/menu_anchor.dart b/lib/src/menu_anchor.dart
+--- a/lib/src/menu_anchor.dart
++++ b/lib/src/menu_anchor.dart
+@@ -34,6 +34,7 @@
+     case TargetPlatform.iOS:
+     case TargetPlatform.macOS:
+       return true;
++    case TargetPlatform.ohos:
+     case TargetPlatform.android:
+     case TargetPlatform.fuchsia:
+     case TargetPlatform.linux:
+@@ -2528,6 +2529,7 @@
+ 
+     switch (defaultTargetPlatform) {
+       case TargetPlatform.iOS:
++      case TargetPlatform.ohos:
+       case TargetPlatform.android:
+         HapticFeedback.selectionClick();
+       case TargetPlatform.fuchsia:
+diff --git a/lib/src/picker.dart b/lib/src/picker.dart
+--- a/lib/src/picker.dart
++++ b/lib/src/picker.dart
+@@ -282,6 +282,7 @@
+           HapticFeedback.selectionClick();
+           SystemSound.play(SystemSoundType.tick);
+         }
++      case TargetPlatform.ohos:
+       case TargetPlatform.android:
+       case TargetPlatform.fuchsia:
+       case TargetPlatform.linux:
+diff --git a/lib/src/slider.dart b/lib/src/slider.dart
+--- a/lib/src/slider.dart
++++ b/lib/src/slider.dart
+@@ -281,6 +281,7 @@
+         } else {
+           HapticFeedback.selectionClick();
+         }
++      case TargetPlatform.ohos:
+       case TargetPlatform.android:
+       case TargetPlatform.fuchsia:
+       case TargetPlatform.linux:
+diff --git a/lib/src/switch.dart b/lib/src/switch.dart
+--- a/lib/src/switch.dart
++++ b/lib/src/switch.dart
+@@ -700,6 +700,7 @@
+     switch (defaultTargetPlatform) {
+       case TargetPlatform.iOS:
+         HapticFeedback.lightImpact();
++      case TargetPlatform.ohos:
+       case TargetPlatform.android:
+       case TargetPlatform.fuchsia:
+       case TargetPlatform.linux:
+diff --git a/lib/src/text_field.dart b/lib/src/text_field.dart
+--- a/lib/src/text_field.dart
++++ b/lib/src/text_field.dart
+@@ -1138,6 +1138,7 @@
+           ValueNotifier<MagnifierInfo> magnifierInfo,
+         ) {
+           switch (defaultTargetPlatform) {
++            case TargetPlatform.ohos:
+             case TargetPlatform.android:
+             case TargetPlatform.iOS:
+               return CupertinoTextMagnifier(controller: controller, magnifierInfo: magnifierInfo);
+@@ -1321,6 +1322,7 @@
+       case TargetPlatform.linux:
+       case TargetPlatform.windows:
+       case TargetPlatform.fuchsia:
++      case TargetPlatform.ohos:
+       case TargetPlatform.android:
+         if (cause == SelectionChangedCause.longPress) {
+           _editableText.bringIntoView(selection.extent);
+@@ -1330,6 +1332,7 @@
+     switch (defaultTargetPlatform) {
+       case TargetPlatform.iOS:
+       case TargetPlatform.fuchsia:
++      case TargetPlatform.ohos:
+       case TargetPlatform.android:
+         break;
+       case TargetPlatform.macOS:
+@@ -1537,6 +1540,7 @@
+     VoidCallback? handleDidLoseAccessibilityFocus;
+     switch (defaultTargetPlatform) {
+       case TargetPlatform.iOS:
++      case TargetPlatform.ohos:
+       case TargetPlatform.android:
+       case TargetPlatform.fuchsia:
+         textSelectionControls ??= cupertinoTextSelectionHandleControls;

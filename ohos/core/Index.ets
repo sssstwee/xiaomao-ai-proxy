@@ -1,12 +1,12 @@
 export {
-  invokeAction,
+  invokeMethod,
   startTUN,
   quickSetup,
   setEventListener,
   getTotalTraffic,
   getTraffic,
   stopTun,
-  suspend,
   forceGC,
   updateDns,
+  resetNetwork,
 } from 'libcore.so'

@@ -1,5 +1,12 @@
-# CC保镖
+# proxy
 
-CC保镖 is a proxy client for HarmonyOS. CC stands for Claude and Codex, whose connections it helps protect.
+FlClash's desktop system-proxy integration.
 
-Download the HAP from [Releases](https://github.com/sssstwee/xiaomao-ai-proxy/releases). If unsigned, sign it with a HarmonyOS debug certificate and profile containing your phone’s UDID, then install it using DevEco Studio with developer mode and USB debugging enabled on your HarmonyOS phone.
+- Windows uses a Flutter method channel and WinINet settings.
+- macOS uses `/usr/sbin/networksetup` for each active network service.
+- Linux uses GNOME/MATE `gsettings` or KDE `kwriteconfig` based on the active
+  desktop environment.
+
+The public `Proxy` API validates the port, applies HTTP, HTTPS, and SOCKS
+settings to `127.0.0.1`, and returns `false` when the selected platform backend
+is unavailable or a command fails.

@@ -37,15 +37,15 @@ export class CallbackStub extends rpc.RemoteObject {
 }
 
 export class ResultStub extends rpc.RemoteObject {
-  private onResult: (data: number) => void | undefined
-  constructor(descriptor: string, onResult: (data: number) => void) {
+  private onResult: (data: number, error: string) => void | undefined
+  constructor(descriptor: string, onResult: (data: number, error: string) => void) {
     super(descriptor)
     this.onResult = onResult
   }
 
   onRemoteMessageRequest(code: number, send: rpc.MessageSequence, reply: rpc.MessageSequence, option: rpc.MessageOption): boolean | Promise<boolean> {
     const data = send.readLong()
-    this.onResult(data)
+    this.onResult(data, send.readString())
     return true
   }
 }
@@ -220,9 +220,9 @@ export default class EntryAbility extends FlutterAbility {
     return this.disconnect()
   }
 
-  handleInvokeAction(data: string, callbackStub: CallbackStub): Promise<rpc.RequestResult> {
+  handleInvokeMethod(data: string, callbackStub: CallbackStub): Promise<rpc.RequestResult> {
     return this.ensureConnected().then((remote: rpc.RemoteObject) => {
-      return this.sender.send(remote, RPCType.invokeAction, data, (send: rpc.MessageSequence) => {
+      return this.sender.send(remote, RPCType.invokeMethod, data, (send: rpc.MessageSequence) => {
         send.writeRemoteObject(callbackStub)
       })
     })

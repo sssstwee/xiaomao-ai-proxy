@@ -1,0 +1,10 @@
+{
+  "name": "file_picker_ohos",
+  "version": "1.0.0",
+  "description": "OpenHarmony implementation of file_picker.",
+  "main": "index.ets",
+  "license": "Apache-2.0 AND MIT",
+  "dependencies": {
+    "@ohos/flutter_ohos": "file:./har/flutter.har"
+  }
+}

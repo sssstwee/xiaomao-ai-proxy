@@ -50,7 +50,7 @@ for entry in entries:
 uuid = re.compile(rb'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}', re.I)
 host = re.compile(rb'https?://(?:[a-z0-9-]+\.)+(?:workers|pages)\.dev\b', re.I)
 database_id = re.compile(rb'[\"\']?database_id[\"\']?\s*[:=]\s*[\"\']([^\"\']+)[\"\']', re.I)
-proxy_uri = re.compile(rb'(?:ss|vmess|trojan)://', re.I)
+proxy_uri = re.compile(rb'(?<![A-Za-z0-9+.-])(?:ss|vmess|vless|trojan)://[A-Za-z0-9_+/%=-]', re.I)
 leaked_d1_hash = '1c446b78d3d383b101f11be506a5817e398b263157e402093ac02ccc0b198f21'
 issues = []
 reader = subprocess.Popen(['git', 'cat-file', '--batch'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
@@ -108,7 +108,7 @@ try:
         if any(hashlib.sha256(value.lower()).hexdigest() == leaked_d1_hash for value in uuid.findall(content)):
             reasons.append('rotated D1 database identifier fingerprint')
         # Test fixtures may contain protocol examples; all other tracked files are checked.
-        is_test = path.startswith(('test/', 'backend/test/', 'backend/scripts/test/'))
+        is_test = path.startswith(('test/', 'backend/test/', 'backend/scripts/test/')) or path.endswith('_test.go')
         if not is_test and proxy_uri.search(content):
             reasons.append('proxy URI outside test fixtures')
         issues.extend((path, reason) for reason in reasons)
