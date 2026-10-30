@@ -55,8 +55,9 @@ Future<void> main(List<String> args) async {
 
   final env = results['env'] as String;
   final rootDir = Directory.current.path;
-  final skipped = packagesNotBuildingAssets(
+  final skipped = packagesMissingAssets(
     File(p.join(rootDir, 'pubspec.yaml')).readAsStringSync(),
+    platform: platform,
   );
   if (skipped.isNotEmpty) {
     stderr.writeln(
@@ -129,15 +130,18 @@ Map<String, String> createBuildEnvironment(String env) {
   return {'APP_ENV': env};
 }
 
-/// Packages whose build hook `pubspec.yaml` turns into a no-op.
-List<String> packagesNotBuildingAssets(String pubspec) {
+/// OHOS explicitly builds its Go and Rust libraries before invoking Flutter.
+List<String> packagesMissingAssets(String pubspec, {String? platform}) {
   final document = loadYaml(pubspec);
   if (document is! Map) return const [];
   final defines = (document['hooks'] as Map?)?['user_defines'];
   if (defines is! Map) return const [];
   return [
     for (final MapEntry(:key, :value) in defines.entries)
-      if (value is Map && value['build_assets'] == false) key.toString(),
+      if (value is Map &&
+          value['build_assets'] == false &&
+          (platform != 'ohos' || !{'setup', 'rust_api'}.contains(key)))
+        key.toString(),
   ]..sort();
 }
 
@@ -240,7 +244,7 @@ Future<int> _packageOhos(
     stderr.writeln('OHOS package targets must be hap and/or app.');
     return 64;
   }
-  final environment = {'FLCLASH_OHOS_BUILD': '1'};
+  final environment = <String, String>{};
   final commands = <(String, List<String>)>[
     ('dart', ['plugins/setup/setup_hooks/bin/build_ohos.dart', rootDir]),
     ('bash', ['plugins/rust_api/tool/ohos_rust.sh', 'build']),

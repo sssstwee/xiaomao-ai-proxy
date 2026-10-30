@@ -49,7 +49,7 @@ switch to an unadapted official Go toolchain.
   and `platform`, preserving the upstream Android path.
 - 93 targeted Flutter tests across Core library lifecycle, controller,
   protocol contracts and the service transport.
-- 27 distinct setup-hook tests covering source lock/check/apply/reverse,
+- 50 full setup-hook tests passed from the root dependency resolution, including source lock/check/apply/reverse,
   compatibility-module generation, the arm64 OHOS target and hook selection.
 - Targeted Dart analysis of the adapted Core, service and setup hook: no issues.
 
@@ -66,16 +66,17 @@ cd ..
 dart core/prepare_mihomo.dart --reverse
 ```
 
-For Flutter validation, keep the temporary `setup` and `rust_api`
-`build_assets: false` switches in place as the repository's verification runner
-does. Restore them before any separately authorized package build.
+Keep the `setup` and `rust_api` `build_assets: false` user-defines in place for
+Flutter validation and the OHOS package pipeline. These serialized hook inputs
+disable automatic host builds before a Dart command starts. OHOS builds use
+explicit platform builders; the Go builder does not read these hook switches.
 
 ## Package build entry and remaining validation
 
 The authorized OHOS build will call:
 
 ```sh
-FLCLASH_OHOS_BUILD=1 dart run plugins/setup/setup_hooks/bin/build_ohos.dart /path/to/repository
+dart run plugins/setup/setup_hooks/bin/build_ohos.dart /path/to/repository
 ```
 
 `GOROOT`/`PATH` must select the pinned OHOS Go 1.26; `OHOS_SDK_HOME` points to
@@ -83,8 +84,11 @@ the SDK's `default/openharmony` directory. The entry prepares the locked sources
 and compatibility module, builds only the arm64 shared-library target, and
 copies `libclash.so`, generated `libclash.h`, and `bridge.h` to the OHOS host's
 ABI directories. The explicit entry and Flutter hook share the build cache.
-The environment flag must exist before starting Dart; it suppresses automatic
-host Core/Helper and Rust hooks before the explicit OHOS entry runs.
+The OHOS target has no desktop Helper, so the explicit Go entry returns before
+Rust Helper construction or toolchain detection. The separate explicit OHOS
+Rust bridge build remains the package pipeline's responsibility. Environment
+flags are not used to disable automatic hooks because hook sandboxing can
+filter them; both `build_assets` user-defines must already be false.
 
 No client shared library, HAP or APP was built during these checks. Linking,
 HarmonyOS loader/CGO ABI, VPN consent/revoke, rapid start/stop, network changes,

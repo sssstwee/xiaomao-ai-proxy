@@ -14,7 +14,7 @@ typedef CoreBuildFunction = Future<BuildReport> Function(BuildRequest request);
 
 final _log = Logger('setup_hooks');
 
-/// CI sets `build_assets: false` for `flutter test`; no test loads the Core.
+/// CI disables automatic hooks for tests and explicit OHOS builds.
 bool buildsAssets(BuildInput input) =>
     input.userDefines['build_assets'] != false;
 

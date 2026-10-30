@@ -4,10 +4,6 @@ import 'package:code_assets/code_assets.dart';
 import 'package:flutter_rust_bridge_hooks/flutter_rust_bridge_hooks.dart';
 
 void main(List<String> args) async {
-  if (Platform.environment['FLCLASH_OHOS_BUILD'] == '1') {
-    stdout.writeln('HarmonyOS uses the explicitly staged librust_api.so.');
-    return;
-  }
   await build(args, (input, output) async {
     if (input.userDefines['build_assets'] == false) {
       stdout.writeln('Skipping the Rust build: user-define build_assets=false');

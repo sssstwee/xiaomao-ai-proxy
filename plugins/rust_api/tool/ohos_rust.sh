@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# OHOS is checked against this compiler; do not inherit the desktop crate's toolchain.
+export RUSTUP_TOOLCHAIN="${RUSTUP_TOOLCHAIN:-1.92.0}"
+
 # The default is verification only; release compilation is explicitly requested by setup.dart.
 mode="${1:-check}"
 case "$mode" in

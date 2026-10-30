@@ -7,7 +7,7 @@
 
 - Flutter-OHOS 3.47.7 预览工具链，固定提交
   `650641656fef1d0578f0bc1ed8f7a35087fc99f3`，Dart 3.13.5。
-- Rust 1.92.0，已安装官方 `aarch64-unknown-linux-ohos` 标准库。
+- Rust 1.92.0，OHOS 脚本默认固定该版本，已安装官方 `aarch64-unknown-linux-ohos` 标准库。
 - 首发设备为 Pura X View / VOL-AL00，既有设备读数为 API 26。
 - 本轮只验证源码、测试程序和目标平台类型；没有执行客户端 `.so` 构建、HAP/APP 打包、
   签名、安装、设备 VPN 切换或发布。
@@ -53,8 +53,10 @@ Rust 宿主测试仅验证编辑器、脚本、键码转换和唯一临时 socke
 - 仅保留 `.github/workflows/harmony-simple.yml`；PR/push 运行检查，客户端包与 Release
   限定为 `workflow_dispatch` 且分支为 `main`。校验阶段临时关闭 setup/rust native-assets
   构建 hooks；普通源码中的默认值仍保持开启。
-- 授权构建入口须提供 `FLCLASH_OHOS_BUILD=1`，以免 `dart setup.dart ohos` 在进入 main 前
-  运行宿主构建 hook。OHOS 包装通过显式 Go/Rust 构建流程暂存库，随后运行 Flutter HAP/APP。
+- OHOS 授权构建须在进入 Dart 包装入口前将 setup/rust 两个 `build_assets` 设为 `false`，
+  并在整个 Flutter HAP/APP 流程中保持关闭。Dart hooks 会过滤非白名单环境变量，
+  `FLCLASH_OHOS_BUILD` 不能作为禁止隐式宿主构建的可靠开关。OHOS 包装通过显式 Go/Rust
+  构建流程暂存库，随后运行 Flutter HAP/APP；其他平台继续使用上游 hooks。
 - setup-ohos v2.0.0 导出 `HOS_SDK_HOME=…/command-line-tools/sdk`；原生测试 resolver 和
   Rust SDK 脚本均识别 `default/openharmony` 路径。
 - `libclash.so` 暂存于 `ohos/core/libs/arm64-v8a`，`libclash.h` 与 `bridge.h`

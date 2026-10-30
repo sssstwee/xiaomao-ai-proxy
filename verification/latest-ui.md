@@ -39,3 +39,14 @@
 ![配置](previews/latest-profiles.png)
 
 ![工具](previews/latest-tools.png)
+
+## 官方 Logo 与“小猫代理”名称
+
+按用户要求保留官方 FlClash v0.9.2 原 Logo，仅保留“小猫代理”的显示名称。
+
+- 上游来源固定为 `7fd417fb9a9a277c6a9339a8ac87f907df7c25f7`。
+- `assets/images/icon.png` 和鸿蒙启动窗口 `ohos/entry/src/main/resources/base/media/icon.png` 逐字节复用上游 PNG；SHA-256 为 `15ff524fa1fb92168b692797d842870b16b7974619c5829d624902a3a6a2bc46`。
+- 鸿蒙桌面沿用 `layered_image.json` 的前景/背景分层。前景 `foreground.svg` 机械转换上游 `android/.../ic_launcher_foreground.xml`，保持其三条路径、三组渐变和两级安全区变换；背景 `background.svg` 复用上游 `ic_launcher_background.xml` 的 `#F7F9FB`。没有重新设计或使用 AI 绘图。
+- 删除旧猫图标的 `app_icon*.svg`、旧 PNG 图层和 `generate_app_icon.dart`，恢复最新版官方 `assets_source/images/icon/` 五份源 SVG，避免后续生成覆盖回旧样式。
+- 已核对 AppScope、EntryAbility、TempAbility 图标引用，确认前景/背景各只有一个同名资源；应用显示名及桌面标签仍为“小猫代理”。
+- 验证包括 PNG 原始字节比对、矢量路径/渐变属性比对、SVG 解析渲染、资源引用和名称检查。此图标调整未执行客户端构建、打包或安装；系统资源编译和真机桌面显示在授权打包后验证。

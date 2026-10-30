@@ -3,7 +3,7 @@
 ## HarmonyOS validation and packaging
 
 Use the pinned Flutter OHOS SDK, with `HOS_SDK_HOME` set to the command-line SDK root.
-For validation only, temporarily set both `hooks.user_defines.setup.build_assets`
+For local validation, temporarily set both `hooks.user_defines.setup.build_assets`
 and `hooks.user_defines.rust_api.build_assets` to `false`; restore both to `true`
 before committing. Run `flutter pub get`, `flutter analyze --no-fatal-infos`, and
 `python3 tool/test_without_native_rust.py`. This executes the root tests except
@@ -12,10 +12,13 @@ files requiring a compiled Rust client library, which are printed explicitly.
 checks Rust algorithms; `bash plugins/rust_api/tool/ohos_rust.sh check` checks
 the HarmonyOS target without linking a client library.
 
-Do not execute `FLCLASH_OHOS_BUILD=1 dart setup.dart ohos --env stable` locally. It builds both native
+Do not execute `dart setup.dart ohos --env stable` locally. It builds both native
 libraries and unsigned HAP/APP artifacts. After user approval, dispatch
-`harmony-simple.yml` on `main`; PR/push runs validate only. Successful authorized
-main packages are published with HAP, APP ZIP and SHA256SUMS.
+`harmony-simple.yml` on `main`; PR/push runs validate only. Keep both Go/Rust
+hook user-defines `false` throughout OHOS packaging: the
+script explicitly builds and stages these libraries. Native hook subprocesses
+filter environment variables, so an environment-only guard cannot isolate them.
+Successful authorized main packages are published with HAP, APP ZIP and SHA256SUMS.
 
 ## Building (upstream Android/desktop reference)
 
@@ -73,8 +76,9 @@ stays on there because the editor tests in `test/plugins/code_forge/` and the so
 test in `test/core/desktop/ipc_native_test.dart` load the Rust library the hook
 builds; the release-notes job, which runs no tests, flips both.
 Never commit `false`: a build with it set stages whatever `libclash/` already
-holds and bundles no Rust library, which is why `setup.dart` refuses to package
-while it is set. Locally, `false` is worth setting for a Dart-only test loop,
+holds and bundles no Rust library on the upstream Android/desktop path, so
+`setup.dart` refuses those targets while it is set. The OHOS Actions path above
+uses explicit builders instead and leaves both hooks disabled in its checkout. Locally, `false` is worth setting for a Dart-only test loop,
 but the hook cache keys on the user-define, so the first build afterwards runs
 the hooks again. The editor and IPC socket tests still need the Rust library: keep `rust_api`
 on, or point `FRB_DART_LOAD_EXTERNAL_LIBRARY_NATIVE_LIB_DIR` at a directory that

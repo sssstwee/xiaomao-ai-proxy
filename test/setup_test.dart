@@ -57,8 +57,29 @@ hooks:
       build_assets: true
 ''';
 
-      expect(setup.packagesNotBuildingAssets(pubspec), ['setup']);
-      expect(setup.packagesNotBuildingAssets('name: x\n'), isEmpty);
+      expect(setup.packagesMissingAssets(pubspec), ['setup']);
+      expect(setup.packagesMissingAssets('name: x\n'), isEmpty);
+    });
+
+    test('OHOS manual builders cover only the Go and Rust hooks', () {
+      const pubspec = '''
+hooks:
+  user_defines:
+    setup:
+      build_assets: false
+    rust_api:
+      build_assets: false
+    sqlite3:
+      build_assets: false
+''';
+      expect(setup.packagesMissingAssets(pubspec, platform: 'ohos'), [
+        'sqlite3',
+      ]);
+      expect(setup.packagesMissingAssets(pubspec, platform: 'android'), [
+        'rust_api',
+        'setup',
+        'sqlite3',
+      ]);
     });
 
     test('packages every Linux format on every architecture', () {

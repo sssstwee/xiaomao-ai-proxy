@@ -31,7 +31,7 @@
 | OHOS 文件选择器 | 5 项真实通道格式测试通过 |
 | Core/Dart 定向测试 | 93 项通过；与根回归有重叠 |
 | Go | Go 1.26.4 下 portable/OHOS 标签测试、vet 与 Android arm64 cross-vet 通过 |
-| 构建工具测试 | 27 项不同测试通过，没有执行客户端构建 |
+| 构建工具测试 | 50 项完整构建工具测试通过，没有执行客户端构建 |
 | ArkTS VPN 生命周期 | 24 项通过，执行实际 ETS 源码，SDK/通道使用替身 |
 | 原生 C/C++ | 当前 cgo 头文件与 OHOS arm64 SDK 的语法检查通过，没有链接客户端库 |
 | Rust | OHOS 目标 cargo check 通过；宿主 cargo test --lib 的 60 项通过 |
@@ -39,7 +39,8 @@
 为遵守打包前确认的要求，测试时临时关闭 Go/Rust 客户端构建 hooks。
 `tool/test_without_native_rust.py` 明确列出需要已编译 Rust 客户端动态库的 18 个测试文件，
 本轮未运行这些 FFI/编辑器加载集成测试。Rust 算法测试与 OHOS 目标检查不能替代动态库装载验证。
-提交的默认 hook 开关保持开启，授权构建由 Actions 显式准备 OHOS 库。
+提交的默认 hook 开关保持开启；Actions 在校验及 OHOS 包装全过程使用两个 `false` user-define，
+由 setup 显式构建/暂存 OHOS 库。不能依赖被 hook 子进程过滤的环境变量来阻止宿主构建。
 
 ## 界面预览
 
@@ -54,7 +55,8 @@
 
 仅保留 `.github/workflows/harmony-simple.yml`：PR/push 只验证，`workflow_dispatch` 且为
 `main` 才构建 unsigned HAP/APP 并发布 HAP、APP ZIP 与 SHA256SUMS。
-用户确认界面并明确同意打包后，再触发该手动流程。
+用户已于本轮明确授权改造后打包并安装，保留 FlClash 原版 logo、名称为“小猫代理”。
+待代码与 CI 验证完成后触发一次该手动流程。
 
 新包名需要匹配的签名 Profile；任务保活权限的 ACL、实际 ArkTS/Hvigor 编译、Go/Rust 库链接与
 共同装载、VPN 授权、连接/停止、切网/锁屏、DNS/IPv6 与应用分流均待打包后在目标手机验证。
