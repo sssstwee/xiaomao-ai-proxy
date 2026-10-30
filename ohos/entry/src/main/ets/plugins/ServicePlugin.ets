@@ -14,6 +14,18 @@ import { publishEvent } from '../utils/Event'
 import { globalState, RunState } from '../GlobalState';
 import EntryAbility from '../entryability/EntryAbility';
 
+class CoreMethodCallHandler implements MethodCallHandler {
+  private callback: (call: MethodCall, result: MethodResult) => void
+
+  constructor(callback: (call: MethodCall, result: MethodResult) => void) {
+    this.callback = callback
+  }
+
+  onMethodCall(call: MethodCall, result: MethodResult): void {
+    this.callback(call, result)
+  }
+}
+
 export default class ServicePlugin implements FlutterPlugin, MethodCallHandler {
   private parent: EntryAbility
   private channel: MethodChannel | undefined
@@ -30,9 +42,9 @@ export default class ServicePlugin implements FlutterPlugin, MethodCallHandler {
     this.channel = new MethodChannel(binding.getBinaryMessenger(), 'com.follow.clash/service')
     this.channel.setMethodCallHandler(this)
     this.coreChannel = new MethodChannel(binding.getBinaryMessenger(), 'com.follow.clash/core')
-    const coreHandler: MethodCallHandler = {
-      onMethodCall: (call: MethodCall, result: MethodResult): void => this.onCoreMethodCall(call, result),
-    }
+    const coreHandler = new CoreMethodCallHandler((call: MethodCall, result: MethodResult): void => {
+      this.onCoreMethodCall(call, result)
+    })
     this.coreChannel.setMethodCallHandler(coreHandler)
     this.subscriber = commonEventManager.createSubscriberSync({
       events: ['HARMONY_NOTIF_ACTION', 'HARMONY_VPN_ERROR'],
