@@ -200,6 +200,7 @@
   "proxyGroup": "Groupe de proxys",
   "go": "Aller",
   "externalLink": "Lien externe",
+  "externalLinkOpenFailed": "Impossible d’ouvrir le navigateur. Copiez le lien et ouvrez-le manuellement.",
   "otherContributors": "Autres contributeurs",
   "appIconDesign": "Conception de l’icône de l’app",
   "autoCloseConnections": "Fermer les connexions automatiquement",

@@ -200,6 +200,7 @@
   "proxyGroup": "Grupo de proxies",
   "go": "Ir",
   "externalLink": "Enlace externo",
+  "externalLinkOpenFailed": "No se pudo abrir el navegador. Copia el enlace y ábrelo manualmente.",
   "otherContributors": "Otros colaboradores",
   "appIconDesign": "Diseño del icono de la app",
   "autoCloseConnections": "Cerrar conexiones automáticamente",

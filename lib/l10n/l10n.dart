@@ -1556,6 +1556,16 @@ class AppLocalizations {
     );
   }
 
+  /// `Could not open the browser. Copy the link and open it manually.`
+  String get externalLinkOpenFailed {
+    return Intl.message(
+      'Could not open the browser. Copy the link and open it manually.',
+      name: 'externalLinkOpenFailed',
+      desc: '',
+      args: [],
+    );
+  }
+
   /// `Other contributors`
   String get otherContributors {
     return Intl.message(

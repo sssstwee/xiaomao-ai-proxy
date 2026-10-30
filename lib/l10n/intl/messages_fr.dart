@@ -864,6 +864,9 @@ class MessageLookup extends MessageLookupByLibrary {
       "Secret du contrôleur externe",
     ),
     "externalLink": MessageLookupByLibrary.simpleMessage("Lien externe"),
+    "externalLinkOpenFailed": MessageLookupByLibrary.simpleMessage(
+      "Impossible d’ouvrir le navigateur. Copiez le lien et ouvrez-le manuellement.",
+    ),
     "extraLarge": MessageLookupByLibrary.simpleMessage("Très grande"),
     "fade": MessageLookupByLibrary.simpleMessage("Fondu"),
     "failedCount": m28,

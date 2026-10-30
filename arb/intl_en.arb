@@ -200,6 +200,7 @@
   "proxyGroup": "Proxy group",
   "go": "Go",
   "externalLink": "External link",
+  "externalLinkOpenFailed": "Could not open the browser. Copy the link and open it manually.",
   "otherContributors": "Other contributors",
   "appIconDesign": "App icon design",
   "autoCloseConnections": "Auto close connections",

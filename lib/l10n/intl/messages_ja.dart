@@ -686,6 +686,9 @@ class MessageLookup extends MessageLookupByLibrary {
       "外部コントローラーのシークレット",
     ),
     "externalLink": MessageLookupByLibrary.simpleMessage("外部リンク"),
+    "externalLinkOpenFailed": MessageLookupByLibrary.simpleMessage(
+      "ブラウザーを開けませんでした。リンクをコピーして手動で開いてください。",
+    ),
     "extraLarge": MessageLookupByLibrary.simpleMessage("特大"),
     "fade": MessageLookupByLibrary.simpleMessage("フェード"),
     "failedCount": m28,

@@ -17,6 +17,7 @@ import 'package:fl_clash/views/dashboard/widgets/card.dart';
 import 'package:fl_clash/views/dashboard/widgets/current_outbound.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/rendering.dart';
@@ -39,6 +40,21 @@ const _residential = IpQuality(
   organization: 'Example Broadband',
   asn: 64500,
 );
+
+final _onePixelPng = base64Decode(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+);
+
+class _ImportedIconSets extends IconSets {
+  _ImportedIconSets(this.initial);
+
+  final List<IconSet> initial;
+
+  @override
+  Stream<List<IconSet>> build() => Stream.value(initial);
+
+  void replace(List<IconSet> iconSets) => state = AsyncData(iconSets);
+}
 
 class _MockCore extends Mock implements CoreHandlerInterface {}
 
@@ -95,17 +111,20 @@ Widget _card({DashboardDensity density = DashboardDensity.standard}) =>
 Widget _app(
   Future<IpQuality> Function(Ref ref, String ip) quality, {
   DashboardDensity density = DashboardDensity.standard,
+  String countryCode = 'GB',
+  List<IconSet> iconSets = const [],
 }) {
   return TestApp(
     locale: const Locale('en'),
     overrides: [
       profilesProvider.overrideWithValue(const [_profile]),
+      iconSetsProvider.overrideWith(() => _ImportedIconSets(iconSets)),
       suspendProvider.overrideWithValue(false),
       outboundIpProbeProvider.overrideWithBuild(
-        (_, _) => const RoutedProbeState({
+        (_, _) => RoutedProbeState({
           routedOutbound: ProbeEntry(
             phase: ProbePhase.fresh,
-            value: IpInfo(ip: _ip, countryCode: 'GB'),
+            value: IpInfo(ip: _ip, countryCode: countryCode),
           ),
         }),
       ),
@@ -123,6 +142,7 @@ Widget _probingApp(
     locale: const Locale('en'),
     overrides: [
       profilesProvider.overrideWithValue(const [_profile]),
+      iconSetsProvider.overrideWith(() => _ImportedIconSets(const [])),
       routeTrackerProvider.overrideWithBuild(
         (ref, _) => RouteState(
           coreEpoch: 1,
@@ -168,6 +188,9 @@ DashboardChip _chip(WidgetTester tester, String label) =>
 void main() {
   setUpAll(() => registerFallbackValue(const OutboundIpParams(timeout: 0)));
 
+  setUp(() => readRemoteIcon = (_) => Stream.value(_onePixelPng));
+  tearDown(() => readRemoteIcon = null);
+
   group('the exit address', () {
     testWidgets('shows with its country, type, quality and organization', (
       tester,
@@ -182,6 +205,223 @@ void main() {
       expect(find.text('Example Broadband'), findsOneWidget);
       expect(find.text('Status'), findsOneWidget);
       expect(find.byGlyph(AppGlyphs.refresh), findsNothing);
+    });
+
+    testWidgets('matches the resolved country against imported icons', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _app(
+          (_, _) async => _residential,
+          countryCode: ' jp ',
+          iconSets: const [
+            IconSet(
+              id: 1,
+              name: 'Flags',
+              icons: [
+                IconSetIcon(
+                  name: 'JP.png',
+                  url: 'https://example.com/country-badge/jp.png',
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        tester.widget<CommonTargetIcon>(find.byType(CommonTargetIcon)).src,
+        'https://example.com/country-badge/jp.png',
+      );
+      expect(find.byType(Image), findsOneWidget);
+      expect(find.text(_ip), findsOneWidget);
+    });
+
+    testWidgets('prefers a Qure flag over its country-code badge', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _app(
+          (_, _) async => _residential,
+          countryCode: 'JP',
+          iconSets: const [
+            IconSet(
+              id: 1,
+              name: 'Qure Area',
+              icons: [
+                IconSetIcon(
+                  name: 'JP.png',
+                  url: 'https://example.com/country-badge/jp-letters.png',
+                ),
+                IconSetIcon(
+                  name: 'Japan.png',
+                  url: 'https://example.com/country-badge/japan-flag.png',
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<CommonTargetIcon>(find.byType(CommonTargetIcon)).src,
+        'https://example.com/country-badge/japan-flag.png',
+      );
+    });
+
+    testWidgets('matches a GB exit to Qure UK icons', (tester) async {
+      await tester.pumpWidget(
+        _app(
+          (_, _) async => _residential,
+          iconSets: const [
+            IconSet(
+              id: 1,
+              name: 'Qure Area',
+              icons: [
+                IconSetIcon(
+                  name: 'UK.png',
+                  url: 'https://example.com/country-badge/uk.png',
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+      await tester.pump();
+
+      expect(
+        tester.widget<CommonTargetIcon>(find.byType(CommonTargetIcon)).src,
+        'https://example.com/country-badge/uk.png',
+      );
+    });
+
+    testWidgets('does not use a partial country-name match', (tester) async {
+      final reads = <String>[];
+      readRemoteIcon = (src) {
+        reads.add(src);
+        return Stream.value(_onePixelPng);
+      };
+      await tester.pumpWidget(
+        _app(
+          (_, _) async => _residential,
+          countryCode: 'US',
+          iconSets: const [
+            IconSet(
+              id: 1,
+              name: 'Other icons',
+              icons: [
+                IconSetIcon(
+                  name: 'US_Map.png',
+                  url: 'https://example.com/country-badge/us-map.png',
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('US'), findsOneWidget);
+      expect(reads, isEmpty);
+    });
+
+    testWidgets(
+      'updates when imported icon sets are added, ordered or deleted',
+      (tester) async {
+        const first = IconSet(
+          id: 1,
+          name: 'First',
+          icons: [
+            IconSetIcon(
+              name: 'GB.png',
+              url: 'https://example.com/country-badge/first-gb.png',
+            ),
+          ],
+        );
+        const second = IconSet(
+          id: 2,
+          name: 'Second',
+          icons: [
+            IconSetIcon(
+              name: 'GB.png',
+              url: 'https://example.com/country-badge/second-gb.png',
+            ),
+          ],
+        );
+        await tester.pumpWidget(_app((_, _) async => _residential));
+        await tester.pump();
+        final container = ProviderScope.containerOf(
+          tester.element(find.byType(CurrentOutboundCard)),
+        );
+        final sets =
+            container.read(iconSetsProvider.notifier) as _ImportedIconSets;
+        expect(find.text('GB'), findsOneWidget);
+
+        sets.replace(const [first, second]);
+        await tester.pump();
+        expect(
+          tester.widget<CommonTargetIcon>(find.byType(CommonTargetIcon)).src,
+          first.icons.single.url,
+        );
+
+        sets.replace(const [second, first]);
+        await tester.pump();
+        expect(
+          tester.widget<CommonTargetIcon>(find.byType(CommonTargetIcon)).src,
+          second.icons.single.url,
+        );
+
+        sets.replace(const []);
+        await tester.pump();
+        expect(find.text('GB'), findsOneWidget);
+      },
+    );
+
+    testWidgets('falls back to the country code when the image cannot load', (
+      tester,
+    ) async {
+      readRemoteIcon = (_) => Stream.error(StateError('image unavailable'));
+      await tester.pumpWidget(
+        _app(
+          (_, _) async => _residential,
+          iconSets: const [
+            IconSet(
+              id: 1,
+              name: 'Unavailable',
+              icons: [
+                IconSetIcon(
+                  name: 'GB.png',
+                  url: 'https://example.com/country-badge/unavailable.png',
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('GB'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('keeps the globe badge when the country is unavailable', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _app((_, _) async => _residential, countryCode: ''),
+      );
+      await tester.pump();
+
+      expect(
+        find.descendant(
+          of: _clover(),
+          matching: find.byGlyph(AppGlyphs.proxies),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text(_ip), findsOneWidget);
+      expect(tester.takeException(), isNull);
     });
 
     testWidgets('a little wider than its card shrinks to fit', (tester) async {
@@ -230,6 +470,7 @@ void main() {
           locale: const Locale('en'),
           overrides: [
             profilesProvider.overrideWithValue(const [_profile]),
+            iconSetsProvider.overrideWith(() => _ImportedIconSets(const [])),
             suspendProvider.overrideWithValue(false),
             outboundIpProbeProvider.overrideWith(_Ips.new),
             ipQualityProvider.overrideWith((_, _) => quality.future),
@@ -483,6 +724,7 @@ void main() {
       overrides: [
         initProvider.overrideWithBuild((_, _) => true),
         profilesProvider.overrideWithValue(profiles),
+        iconSetsProvider.overrideWith(() => _ImportedIconSets(const [])),
         outboundIpProbeProvider.overrideWith(_Ips.new),
         ipQualityProvider.overrideWith((_, _) async => _residential),
         setupActionProvider.overrideWith(_RecordingSetupAction.new),

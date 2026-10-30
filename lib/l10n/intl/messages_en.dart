@@ -810,6 +810,9 @@ class MessageLookup extends MessageLookupByLibrary {
       "External controller secret",
     ),
     "externalLink": MessageLookupByLibrary.simpleMessage("External link"),
+    "externalLinkOpenFailed": MessageLookupByLibrary.simpleMessage(
+      "Could not open the browser. Copy the link and open it manually.",
+    ),
     "extraLarge": MessageLookupByLibrary.simpleMessage("Extra large"),
     "fade": MessageLookupByLibrary.simpleMessage("Fade"),
     "failedCount": m28,

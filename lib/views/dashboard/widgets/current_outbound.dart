@@ -453,7 +453,7 @@ const _spinPeriod = Duration(milliseconds: 1500);
 
 /// The exit's country on a clover that checks the exit again when tapped and
 /// turns while it is being checked.
-class _CountryBadge extends StatefulWidget {
+class _CountryBadge extends ConsumerStatefulWidget {
   const _CountryBadge({
     required this.countryCode,
     required this.size,
@@ -469,10 +469,54 @@ class _CountryBadge extends StatefulWidget {
   final VoidCallback onRefresh;
 
   @override
-  State<_CountryBadge> createState() => _CountryBadgeState();
+  ConsumerState<_CountryBadge> createState() => _CountryBadgeState();
 }
 
-class _CountryBadgeState extends State<_CountryBadge>
+// Qure's ISO-code icons contain letters; its named icons contain the flags.
+const _countryFlagNames = {
+  'AU': 'Australia',
+  'BR': 'Brazil',
+  'CA': 'Canada',
+  'CN': 'China',
+  'DE': 'Germany',
+  'EG': 'Egypt',
+  'EU': 'European Union',
+  'FI': 'Finland',
+  'FR': 'France',
+  'GB': 'United Kingdom',
+  'HK': 'Hong Kong',
+  'IN': 'India',
+  'JP': 'Japan',
+  'KR': 'Korea',
+  'MO': 'Macao',
+  'MY': 'Malaysia',
+  'PH': 'Philippines',
+  'RU': 'Russia',
+  'SG': 'Singapore',
+  'TH': 'Thailand',
+  'TR': 'Turkey',
+  'TW': 'Taiwan',
+  'UN': 'United Nations',
+  'US': 'United States',
+};
+
+String? _countryFlagUrl(List<IconSet> iconSets, String code) {
+  if (!RegExp(r'^[A-Z]{2}$').hasMatch(code)) return null;
+  for (final name in [
+    if (_countryFlagNames[code] case final name?) name,
+    code,
+    if (code == 'GB') 'UK',
+  ]) {
+    for (final iconSet in iconSets) {
+      for (final match in iconSet.icons.scoreFor(name)) {
+        if (match.score == 3) return match.icon.url;
+      }
+    }
+  }
+  return null;
+}
+
+class _CountryBadgeState extends ConsumerState<_CountryBadge>
     with SingleTickerProviderStateMixin {
   late final AnimationController _turns = AnimationController(
     vsync: this,
@@ -521,7 +565,14 @@ class _CountryBadgeState extends State<_CountryBadge>
         : colorScheme.onSurfaceVariant;
     final enabled = !widget.checking;
     final size = widget.size;
-    final code = widget.countryCode;
+    final code = widget.countryCode?.trim().toUpperCase();
+    final iconUrl = code == null || code.isEmpty
+        ? null
+        : ref.watch(
+            iconSetsProvider.select(
+              (state) => _countryFlagUrl(state.value ?? const [], code),
+            ),
+          );
     final tooltip = context.appLocalizations.retry;
     final color = Color.alphaBlend(
       foreground.withValues(alpha: enabled && _hovered ? 0.08 : 0),
@@ -557,15 +608,29 @@ class _CountryBadgeState extends State<_CountryBadge>
                       size: size * 0.42,
                       color: foreground,
                     )
-                  : Text(
-                      code.toUpperCase(),
-                      maxLines: 1,
-                      style: AppTextStyle.footnote
-                          .of(context, emphasized: true)
-                          .copyWith(
-                            color: foreground,
-                            letterSpacing: 0.04 * AppTextStyle.footnote.size,
+                  : SizedBox.square(
+                      dimension: size * 0.7,
+                      child: Semantics(
+                        label: code,
+                        image: iconUrl != null,
+                        excludeSemantics: true,
+                        child: CommonTargetIcon(
+                          src: iconUrl ?? '',
+                          fallback: Center(
+                            child: Text(
+                              code,
+                              maxLines: 1,
+                              style: AppTextStyle.footnote
+                                  .of(context, emphasized: true)
+                                  .copyWith(
+                                    color: foreground,
+                                    letterSpacing:
+                                        0.04 * AppTextStyle.footnote.size,
+                                  ),
+                            ),
                           ),
+                        ),
+                      ),
                     ),
             ),
           ),

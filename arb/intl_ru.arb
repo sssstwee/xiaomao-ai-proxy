@@ -200,6 +200,7 @@
   "proxyGroup": "Группа прокси",
   "go": "Перейти",
   "externalLink": "Внешняя ссылка",
+  "externalLinkOpenFailed": "Не удалось открыть браузер. Скопируйте ссылку и откройте её вручную.",
   "otherContributors": "Другие участники",
   "appIconDesign": "Дизайн значка приложения",
   "autoCloseConnections": "Автозакрытие соединений",

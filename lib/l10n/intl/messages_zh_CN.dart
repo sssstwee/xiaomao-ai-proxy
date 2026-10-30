@@ -629,6 +629,9 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "externalControllerSecret": MessageLookupByLibrary.simpleMessage("外部控制器密钥"),
     "externalLink": MessageLookupByLibrary.simpleMessage("外部链接"),
+    "externalLinkOpenFailed": MessageLookupByLibrary.simpleMessage(
+      "无法打开浏览器，请复制链接后手动打开。",
+    ),
     "extraLarge": MessageLookupByLibrary.simpleMessage("超大"),
     "fade": MessageLookupByLibrary.simpleMessage("淡入"),
     "failedCount": m28,

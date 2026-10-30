@@ -200,6 +200,7 @@
   "proxyGroup": "プロキシグループ",
   "go": "開く",
   "externalLink": "外部リンク",
+  "externalLinkOpenFailed": "ブラウザーを開けませんでした。リンクをコピーして手動で開いてください。",
   "otherContributors": "その他の貢献者",
   "appIconDesign": "アプリアイコンのデザイン",
   "autoCloseConnections": "接続を自動的に閉じる",

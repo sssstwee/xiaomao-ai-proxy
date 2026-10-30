@@ -200,6 +200,7 @@
   "proxyGroup": "策略组",
   "go": "前往",
   "externalLink": "外部链接",
+  "externalLinkOpenFailed": "无法打开浏览器，请复制链接后手动打开。",
   "otherContributors": "其他贡献者",
   "appIconDesign": "应用图标设计",
   "autoCloseConnections": "自动关闭连接",
