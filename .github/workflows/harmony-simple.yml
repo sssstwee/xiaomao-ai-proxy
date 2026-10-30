@@ -47,7 +47,8 @@ jobs:
           git -C "$FLUTTER_DIR" apply "$GITHUB_WORKSPACE/.github/flutter_ohos.patch"
           echo "$FLUTTER_DIR/bin" >> "$GITHUB_PATH"
           echo "$FLUTTER_DIR/bin/cache/dart-sdk/bin" >> "$GITHUB_PATH"
-      - uses: actions/cache@v4
+      - uses: actions/cache/restore@v4
+        id: dart-cache
         with:
           path: ~/.pub-cache
           key: harmony-flutter-3.47.7-${{ runner.os }}-${{ hashFiles('**/pubspec.lock') }}
@@ -61,6 +62,12 @@ jobs:
           GIT_CONFIG_KEY_0: http.version
           GIT_CONFIG_VALUE_0: HTTP/1.1
         run: flutter pub get
+      - name: Preserve resolved Dart dependencies before native packaging
+        if: steps.dart-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.pub-cache
+          key: ${{ steps.dart-cache.outputs.cache-primary-key }}
       - name: Generate Dart sources
         run: |
           dart run intl_utils:generate
@@ -77,7 +84,15 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: '1.27.2'
-          cache-dependency-path: core/go.sum
+          cache: false
+      - uses: actions/cache/restore@v4
+        id: go-cache
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: harmony-go-${{ runner.os }}-1.27.2-${{ hashFiles('core/go.sum') }}
+          restore-keys: harmony-go-${{ runner.os }}-1.27.2-
       - name: Prepare pinned Mihomo sources
         run: |
           dart core/prepare_mihomo.dart
@@ -91,6 +106,14 @@ jobs:
           go test -mod=readonly -tags='with_gvisor openharmony' . ./tun ./platform
           go vet -mod=readonly -tags=with_gvisor ./...
           go vet -mod=readonly -tags='with_gvisor openharmony' . ./tun ./platform
+      - name: Preserve tested Go dependencies before native packaging
+        if: steps.go-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ steps.go-cache.outputs.cache-primary-key }}
       - name: Restore verified upstream sources
         run: dart core/prepare_mihomo.dart --reverse
       - name: Test build harness with the pinned root dependencies

@@ -48,6 +48,28 @@ Rust 宿主测试仅验证编辑器、脚本、键码转换和唯一临时 socke
 - 覆盖启动失败、启动期间停止/销毁、异步 TUN 清理、重复操作、观察者重连、RPC 半包清理、
   后台任务取消、重启定时器清理，以及停止后不再发布过期通知。
 
+## ArkTS handler 语义复核
+
+在 `main` 的 `ce419cf9` 之上修复 `ServicePlugin` 的 core 通道 handler：用命名类
+实现 `MethodCallHandler`，继续转发原来的 core 回调，service/core 两个通道分派保持独立。
+原对象字面量被 SDK ArkTS 1.1 linter 报为 `arkts-no-untyped-obj-literals`（code 38）；
+同接口的隔离反例复现此错误，命名类反例没有该错误。`JSON.stringify({ ... })` 则在
+相同 SDK 中允许，未为推测的错误改动它。
+
+- 使用 SDK 26 内置 TypeScript 4.9.5 分支的 `createIncrementalProgram`（`noEmit: true`）
+  与 `ArkTSLinter_1_1.runArkTSLinter`，检查 EntryAbility、VpnExtAbility、NetworkManager、
+  NotificationManager、State、ServicePlugin、AppPlugin 和 core Index 共 8 个实际 ETS 单元。
+- 引用 OpenHarmony、HMS、ArkUI 的真实 SDK 声明，并引用本地缓存 Flutter HAR
+  `1.0.0-7c82f544833` 的源声明；新 worktree 缺少忽略生成的 GeneratedPluginRegistrant，
+  仅在 checker 的模块解析中引用上一 worktree 同 pubspec 已生成的文件，未手改或运行生成器。
+- 修复后 8 个单元的语法、语义与 ArkTS linter 合计 **0 Error、16 Warning**；Warning
+  均为 SDK 的 `@throws` 调用提示（code 28040）。没有隐藏缺失模块或将缺依赖检查称为通过。
+- `node --test test/native/harmony_vpn_test.cjs` 仍为 **24 项通过**；`git diff --check` 通过。
+
+这次检查没有输出 JS、ABC 或客户端包。缓存 Flutter HAR 声明不是新 Flutter-OHOS 3.47.7
+将使用的 HAR，因此此结果验证当前 ArkTS 语法与所用接口形状，不代替新 HAR 下的正式
+Hvigor 编译、库链接和真机验证。
+
 ## 包装入口与依赖审查
 
 - 仅保留 `.github/workflows/harmony-simple.yml`；PR/push 运行检查，客户端包与 Release
@@ -83,3 +105,8 @@ Rust 宿主测试仅验证编辑器、脚本、键码转换和唯一临时 socke
   和 VPN 被系统回收后的恢复能力，仍须在授权签名与真机测试时核验。
 - 后续真机应对照相同配置验证连接/停止、切网、锁屏、DNS/IPv6、应用分流及原生/兼容环境应用，
   并测量 PSS、CPU、恢复耗时和耗电；本轮不宣称已有性能提升数据。
+
+本次另修正 Dart 启动元数据：HarmonyOS 从 `OhosDeviceInfo.sdkApiVersion` 读取真实 API 版本，
+而非走其他平台的默认 0。该值进入 Core InitParams，保证本机 API 26 能进入原生 UID 查询路径。
+针对 System/Core/打包入口的 107 项 Flutter 测试通过，根静态分析无问题。
+手机内核页大小已只读确认为 4 KiB，与所选 Go 端口的已验证页配置一致。
