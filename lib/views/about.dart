@@ -107,7 +107,7 @@ class _AboutHero extends StatelessWidget {
   });
 
   static const _logoSize = 96.0;
-  static const _logoInset = 4.0;
+  static const _logoInset = 0.0;
 
   @override
   Widget build(BuildContext context) {
