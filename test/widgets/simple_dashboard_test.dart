@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:fl_clash/common/fixed.dart';
+import 'package:fl_clash/common/constant.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/common/harmony_account.dart';
 import 'package:fl_clash/l10n/l10n.dart';
@@ -133,6 +134,7 @@ Widget scoped({
   required Widget child,
   required SignedOutApi api,
   Map<String, dynamic> homeRuntime = const {},
+  Profile? activeProfile,
 }) {
   return ProviderScope(
     key: UniqueKey(),
@@ -143,6 +145,8 @@ Widget scoped({
       ),
       harmonyAccountApiProvider.overrideWithValue(api),
       profilesProvider.overrideWith(_EmptyProfiles.new),
+      if (activeProfile != null)
+        currentProfileProvider.overrideWithValue(activeProfile),
       initProvider.overrideWithValue(true),
       isStartProvider.overrideWithValue(false),
       totalTrafficProvider.overrideWithValue(const Traffic()),
@@ -258,7 +262,7 @@ void main() {
   });
 
   testWidgets(
-    'homepage title and subscription copy can be changed without a new screen implementation',
+    'product identity is fixed while subscription guidance can update remotely',
     (tester) async {
       await tester.pumpWidget(
         scoped(
@@ -274,7 +278,8 @@ void main() {
         ),
       );
       await tester.pump();
-      expect(find.text('我的 CC保镖'), findsOneWidget);
+      expect(find.text(appDisplayName), findsOneWidget);
+      expect(find.text('我的 CC保镖'), findsNothing);
       expect(find.text('从 VPS 获取连接配置'), findsOneWidget);
       await tester.pumpWidget(const SizedBox.shrink());
     },
@@ -404,9 +409,10 @@ void main() {
     await tester.pump();
     expect(find.text('远程服务公告'), findsOneWidget);
     expect(find.text('远程就绪文案'), findsOneWidget);
-    expect(find.text('退出远程账户'), findsOneWidget);
     expect(find.text('线路加速'), findsNothing);
     expect(find.text('AI 网站将走「🤖 AI服务」分组'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('退出远程账户'), 150);
+    expect(find.text('退出远程账户'), findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
@@ -522,7 +528,7 @@ void main() {
     (tester) async {
       final api = SignedOutApi();
       await renderLogin(tester, api);
-      expect(find.text('CC保镖'), findsOneWidget);
+      expect(find.text(appDisplayName), findsOneWidget);
       expect(find.byType(TextFormField), findsOneWidget);
       expect(find.text('导入订阅'), findsNothing);
       expect(find.text('连接'), findsNothing);
@@ -555,6 +561,72 @@ void main() {
     expect(api.configuredUrl, 'https://vps.example.test/private/vpn.yml');
     await tester.pumpWidget(const SizedBox.shrink());
   });
+
+  testWidgets(
+    'an imported local profile has a home without a managed session',
+    (tester) async {
+      const profile = Profile(
+        id: 42,
+        label: '本地配置',
+        autoUpdateDuration: Duration(days: 1),
+      );
+      await tester.pumpWidget(
+        scoped(
+          api: SignedOutApi(),
+          activeProfile: profile,
+          homeRuntime: HarmonyRemoteConfig.decodeHome({
+            'schemaVersion': 1,
+            'texts': {'ready': '只属于托管订阅的提示'},
+            'home': {
+              'sections': ['connection', 'config', 'account'],
+            },
+          }),
+          child: app(const SimpleDashboardView()),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('本地配置'), findsOneWidget);
+      expect(find.text('准备连接'), findsOneWidget);
+      expect(find.text('连接'), findsOneWidget);
+      expect(find.text('只属于托管订阅的提示'), findsNothing);
+      expect(find.byType(TextFormField), findsNothing);
+      expect(find.byKey(const Key('harmony_config_refresh')), findsNothing);
+      expect(find.byKey(const Key('harmony_profile_refresh')), findsNothing);
+      expect(find.text('更换订阅'), findsNothing);
+      expect(find.byTooltip('日志'), findsOneWidget);
+      expect(find.byTooltip('连接'), findsWidgets);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  testWidgets(
+    'the node card opens proxies and the labelled action toggles VPN',
+    (tester) async {
+      var opens = 0;
+      var toggles = 0;
+      await tester.pumpWidget(
+        scoped(
+          api: SignedOutApi(),
+          child: app(
+            SimpleConnectionPanel(
+              phase: ConnectionPhase.disconnected,
+              username: 'example.test',
+              onOpenProxies: () => opens++,
+              onToggle: () => toggles++,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('harmony_connection_action')));
+      await tester.tap(find.byKey(const Key('harmony_current_node')));
+      expect(toggles, 1);
+      expect(opens, 1);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
 
   testWidgets(
     'status icon controls connection and is disabled during transitions',

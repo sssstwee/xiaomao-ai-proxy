@@ -15,6 +15,18 @@ class FakeCompleter extends Fake implements Completer<dynamic> {
   bool get isCompleted => true;
 }
 
+const _setupState = SetupState(
+  profileId: 1,
+  profileLastUpdateDate: null,
+  overwriteType: OverwriteType.standard,
+  rules: [],
+  proxyGroups: [],
+  addedRules: [],
+  script: null,
+  overrideDns: false,
+  dns: Dns(),
+);
+
 void main() {
   late MockCoreHandlerInterface mock;
   late CoreController controller;
@@ -90,6 +102,45 @@ void main() {
   });
 
   group('config methods', () {
+    test('configuration failures do not start the VPN', () async {
+      when(
+        () => mock.setupConfig(any()),
+      ).thenAnswer((_) async => 'sub-rule name is empty');
+      var started = false;
+      final result = await controller.setupConfig(
+        params: const SetupParams(
+          selectedMap: {},
+          testUrl: 'https://example.test',
+        ),
+        setupState: _setupState,
+        preloadInvoke: () => started = true,
+      );
+      expect(result, 'sub-rule name is empty');
+      expect(started, isFalse);
+    });
+
+    test(
+      'configuration waits for VPN startup and propagates its failure',
+      () async {
+        when(() => mock.setupConfig(any())).thenAnswer((_) async => '');
+        final failure = StateError('Native VPN denied');
+        await expectLater(
+          controller.setupConfig(
+            params: const SetupParams(
+              selectedMap: {},
+              testUrl: 'https://example.test',
+            ),
+            setupState: _setupState,
+            preloadInvoke: () async {
+              await Future<void>.delayed(Duration.zero);
+              throw failure;
+            },
+          ),
+          throwsA(same(failure)),
+        );
+      },
+    );
+
     test('validateConfig delegates to interface', () async {
       when(() => mock.validateConfig('/path')).thenAnswer((_) async => 'ok');
       final result = await controller.validateConfig('/path');

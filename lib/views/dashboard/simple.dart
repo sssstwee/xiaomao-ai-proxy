@@ -2,16 +2,18 @@ import 'dart:async';
 
 import 'package:fl_clash/common/harmony_remote_ui.dart';
 import 'package:fl_clash/common/harmony_account.dart';
+import 'package:fl_clash/common/harmony_home_status.dart';
+import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/providers/harmony_home_display.dart';
 import 'package:fl_clash/state.dart';
 
-import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/views/dashboard/widgets/simple_connection.dart';
+import 'package:fl_clash/views/connection/connections.dart';
+import 'package:fl_clash/views/logs.dart';
 import 'package:fl_clash/widgets/widgets.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/svg.dart';
@@ -24,55 +26,15 @@ class SimpleDashboardView extends ConsumerStatefulWidget {
       _SimpleDashboardViewState();
 }
 
-class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
-    with WidgetsBindingObserver {
+class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView> {
   final _formKey = GlobalKey<FormState>();
   final _subscription = TextEditingController();
-  Timer? _homeTimer;
-  StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
-  List<ConnectivityResult>? _lastConnectivity;
   bool _importingConfig = false;
 
   @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      unawaited(ref.read(harmonyHomeDisplayProvider.notifier).refresh());
-      ref.read(harmonySimpleProvider.notifier).bootstrap();
-    });
-    _homeTimer = Timer.periodic(const Duration(minutes: 1), (_) {
-      if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
-        unawaited(ref.read(harmonyHomeDisplayProvider.notifier).refresh());
-      }
-    });
-    _connectivitySub = Connectivity().onConnectivityChanged.listen((results) {
-      if (_lastConnectivity != null && listEquals(_lastConnectivity, results)) {
-        return;
-      }
-      _lastConnectivity = results;
-      ref
-          .read(harmonySimpleProvider.notifier)
-          .reportNetworkConnectivity(results);
-    });
-  }
-
-  @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    _connectivitySub?.cancel();
-    _homeTimer?.cancel();
     _subscription.dispose();
     super.dispose();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed && !_importingConfig) {
-      unawaited(ref.read(harmonyHomeDisplayProvider.notifier).refresh());
-      unawaited(ref.read(harmonySimpleProvider.notifier).onAppResumed());
-    }
   }
 
   Future<void> _subscribe() async {
@@ -85,6 +47,8 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
 
   Future<void> _importConfig() async {
     if (_importingConfig) return;
+    final action = ref.read(harmonySimpleProvider.notifier);
+    action.setConfigImportPending(true);
     setState(() => _importingConfig = true);
     try {
       final file = await picker.pickerFile();
@@ -111,6 +75,7 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
         );
       }
     } finally {
+      action.setConfigImportPending(false);
       if (mounted) setState(() => _importingConfig = false);
     }
   }
@@ -151,92 +116,142 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
     final texts = context.appLocalizations;
     final ui = ref.watch(harmonySimpleProvider);
     final session = ui.session;
+    final profile = ref.watch(currentProfileProvider);
+    final isManaged = profile == null || profile.id == ui.remoteProfile?.id;
     final ready = ref.watch(initProvider);
     final running = ref.watch(isStartProvider);
     final nodeName = _activeNodeName();
     final nodeDelay = _activeDelay(nodeName);
     final phase = _phase(ui, running);
-    final features = ui.remoteRuntime['features'] as Map? ?? {};
+    final features = isManaged
+        ? ui.remoteRuntime['features'] as Map? ?? {}
+        : const <String, dynamic>{};
     final refreshMessages = {
-      'debounced': remoteHarmonyText(
-        ref,
-        'harmonyConfigRefreshDebounced',
-        texts.harmonyConfigRefreshDebounced,
-      ),
-      'success': remoteHarmonyText(
-        ref,
-        'harmonyConfigRefreshSuccess',
-        texts.harmonyConfigRefreshSuccess,
-      ),
-      'failed': remoteHarmonyText(
-        ref,
-        'harmonyConfigRefreshFailed',
-        texts.harmonyConfigRefreshFailed,
-      ),
+      'debounced': isManaged
+          ? remoteHarmonyText(
+              ref,
+              'harmonyConfigRefreshDebounced',
+              texts.harmonyConfigRefreshDebounced,
+            )
+          : texts.harmonyConfigRefreshDebounced,
+      'success': isManaged
+          ? remoteHarmonyText(
+              ref,
+              'harmonyConfigRefreshSuccess',
+              texts.harmonyConfigRefreshSuccess,
+            )
+          : texts.harmonyConfigRefreshSuccess,
+      'failed': isManaged
+          ? remoteHarmonyText(
+              ref,
+              'harmonyConfigRefreshFailed',
+              texts.harmonyConfigRefreshFailed,
+            )
+          : texts.harmonyConfigRefreshFailed,
     };
 
     return CommonScaffold(
-      title: remoteHarmonyText(ref, 'homeTitle', appDisplayName),
+      title: appDisplayName,
+      actions: [
+        IconButton(
+          tooltip: texts.connections,
+          onPressed: () => BaseNavigator.push(context, const ConnectionsView()),
+          icon: const Icon(Icons.monitor_heart_outlined),
+        ),
+        IconButton(
+          tooltip: texts.logs,
+          onPressed: () => BaseNavigator.push(context, const LogsView()),
+          icon: const Icon(Icons.receipt_long_outlined),
+        ),
+      ],
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 480),
-          child: session != null
-              ? SimpleConnectionPanel(
-                  phase: phase,
-                  username:
-                      ref
-                          .read(harmonyAccountApiProvider)
-                          .subscriptionUri
-                          ?.host ??
-                      session.username,
-                  directSubscription: true,
-                  error: ui.error,
-                  usingCachedConfig: ui.usingCachedConfig,
-                  nodeName: nodeName,
-                  nodeDelayMs: nodeDelay,
-                  homeStatus: ui.homeStatus,
-                  issue: ui.issue,
-                  onToggle: ready && !ui.bootstrapping
-                      ? () => ref
-                            .read(harmonySimpleProvider.notifier)
-                            .toggleConnect()
-                      : null,
-                  onLogout: () {
-                    _subscription.text =
-                        ref
-                            .read(harmonyAccountApiProvider)
-                            .subscriptionUri
-                            ?.toString() ??
-                        '';
-                    unawaited(
-                      ref.read(harmonySimpleProvider.notifier).logout(),
-                    );
-                  },
-                  onRetry: () =>
-                      ref.read(harmonySimpleProvider.notifier).retryConnect(),
-                  onImportConfig:
-                      ready &&
-                          !ui.busy &&
-                          !ui.bootstrapping &&
-                          !ui.homeStatus.configSyncInProgress &&
-                          !_importingConfig
-                      ? _importConfig
-                      : null,
-                  configFreshness: ui.homeStatus.configFreshness,
-                  onConfigRefresh: features['manualRefresh'] == false
-                      ? null
-                      : () {
-                          unawaited(
-                            ref
-                                .read(harmonyHomeDisplayProvider.notifier)
-                                .refresh(force: true),
-                          );
-                          unawaited(
-                            ref
-                                .read(harmonySimpleProvider.notifier)
-                                .forceRefreshConfig(messages: refreshMessages),
-                          );
-                        },
+          child: session != null || profile != null
+              ? ProviderScope(
+                  overrides: [
+                    if (!isManaged)
+                      harmonyDisplayRuntimeProvider.overrideWithValue(const {}),
+                  ],
+                  child: SimpleConnectionPanel(
+                    phase: phase,
+                    username: isManaged
+                        ? ref
+                                  .read(harmonyAccountApiProvider)
+                                  .subscriptionUri
+                                  ?.host ??
+                              session?.username ??
+                              ''
+                        : profile.realLabel,
+                    directSubscription: isManaged,
+                    profileName: isManaged ? null : profile.realLabel,
+                    error: ui.error,
+                    usingCachedConfig: isManaged && ui.usingCachedConfig,
+                    nodeName: nodeName,
+                    nodeDelayMs: nodeDelay,
+                    homeStatus: isManaged
+                        ? ui.homeStatus
+                        : HarmonyHomeStatus(
+                            networkKind: ui.homeStatus.networkKind,
+                            lastHealthCheckAt: ui.homeStatus.lastHealthCheckAt,
+                            lastHealthCheckOk: ui.homeStatus.lastHealthCheckOk,
+                          ),
+                    issue: ui.issue,
+                    onToggle: ready && !ui.bootstrapping
+                        ? () => ref
+                              .read(harmonySimpleProvider.notifier)
+                              .toggleConnect()
+                        : null,
+                    onOpenProxies: () => ref
+                        .read(currentPageLabelProvider.notifier)
+                        .toPage(PageLabel.proxies),
+                    onLogout: !isManaged
+                        ? null
+                        : () {
+                            _subscription.text =
+                                ref
+                                    .read(harmonyAccountApiProvider)
+                                    .subscriptionUri
+                                    ?.toString() ??
+                                '';
+                            unawaited(
+                              ref.read(harmonySimpleProvider.notifier).logout(),
+                            );
+                          },
+                    onRetry: () =>
+                        ref.read(harmonySimpleProvider.notifier).retryConnect(),
+                    onImportConfig:
+                        isManaged &&
+                            ready &&
+                            !ui.busy &&
+                            !ui.bootstrapping &&
+                            !ui.homeStatus.configSyncInProgress &&
+                            !_importingConfig
+                        ? _importConfig
+                        : null,
+                    configFreshness: ui.homeStatus.configFreshness,
+                    onConfigRefresh:
+                        features['manualRefresh'] == false ||
+                            (!isManaged && profile.type == ProfileType.file) ||
+                            ui.busy
+                        ? null
+                        : () {
+                            if (isManaged) {
+                              unawaited(
+                                ref
+                                    .read(harmonyHomeDisplayProvider.notifier)
+                                    .refresh(force: true),
+                              );
+                            }
+                            unawaited(
+                              ref
+                                  .read(harmonySimpleProvider.notifier)
+                                  .forceRefreshConfig(
+                                    messages: refreshMessages,
+                                  ),
+                            );
+                          },
+                  ),
                 )
               : AutofillGroup(
                   child: Form(
@@ -246,7 +261,7 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
                       padding: const EdgeInsets.all(24),
                       children: [
                         SvgPicture.asset(
-                          'assets/images/cc_guardian.svg',
+                          'assets/images/cat_awake.svg',
                           width: 64,
                           height: 64,
                           excludeFromSemantics: true,

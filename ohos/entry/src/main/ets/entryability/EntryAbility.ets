@@ -37,15 +37,15 @@ export class CallbackStub extends rpc.RemoteObject {
 }
 
 export class ResultStub extends rpc.RemoteObject {
-  private onResult: (data: number) => void | undefined
-  constructor(descriptor: string, onResult: (data: number) => void) {
+  private onResult: (data: number, error: string) => void | undefined
+  constructor(descriptor: string, onResult: (data: number, error: string) => void) {
     super(descriptor)
     this.onResult = onResult
   }
 
   onRemoteMessageRequest(code: number, send: rpc.MessageSequence, reply: rpc.MessageSequence, option: rpc.MessageOption): boolean | Promise<boolean> {
     const data = send.readLong()
-    this.onResult(data)
+    this.onResult(data, send.readString())
     return true
   }
 }

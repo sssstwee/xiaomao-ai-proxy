@@ -6,7 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test(
-    'replaces old settings while preserving the active subscription and consent',
+    'preserves mobile preferences while keeping profile DNS authoritative',
     () {
       const old = Config(
         currentProfileId: 17,
@@ -33,50 +33,42 @@ void main() {
       final result = harmonyConfigDefaults(old);
       expect(result.currentProfileId, 17);
       expect(result.appSettingProps.disclaimerAccepted, isTrue);
-      expect(result.appSettingProps.locale, isNull);
-      expect(result.appSettingProps.autoRun, isFalse);
-      expect(result.appSettingProps.autoCheckUpdate, isTrue);
-      expect(result.appSettingProps.developerMode, isFalse);
-      expect(result.themeProps.themeMode, ThemeMode.system);
-      expect(result.vpnProps, defaultVpnProps);
-      expect(result.networkProps, defaultNetworkProps);
+      expect(result.appSettingProps, old.appSettingProps);
+      expect(result.themeProps, old.themeProps);
+      expect(result.vpnProps, old.vpnProps);
+      expect(result.networkProps, old.networkProps);
       expect(result.overrideDns, isFalse);
-      expect(result.patchClashConfig, harmonyPatchConfig);
-      expect(result.patchClashConfig.mode, Mode.rule);
-      expect(result.patchClashConfig.allowLan, isFalse);
       expect(
-        result.patchClashConfig.externalController,
-        ExternalControllerStatus.close,
+        result.patchClashConfig,
+        old.patchClashConfig.copyWith(findProcessMode: FindProcessMode.off),
       );
-      expect(result.patchClashConfig.dns.nameserverPolicy, isEmpty);
-      expect(result.excludeSSIDs, isEmpty);
+      expect(result.patchClashConfig.mode, Mode.global);
+      expect(result.patchClashConfig.allowLan, isTrue);
+      expect(result.excludeSSIDs, old.excludeSSIDs);
       expect(harmonyConfigDefaults(result), result);
     },
   );
 
-  test(
-    'keeps subscription data while clearing legacy selections and scripts',
-    () {
-      const old = Profile(
-        id: 17,
-        label: 'Existing subscription',
-        url: 'https://subscription.example/link',
-        autoUpdate: false,
-        autoUpdateDuration: Duration(days: 30),
-        overwriteType: OverwriteType.script,
-        scriptId: 12,
-        selectedMap: {'Main': 'Node'},
-      );
-      final result = harmonyProfileDefaults(old);
-      expect(result.id, old.id);
-      expect(result.label, old.label);
-      expect(result.url, old.url);
-      expect(result.selectedMap, isEmpty);
-      expect(result.autoUpdate, isTrue);
-      expect(result.autoUpdateDuration, const Duration(days: 1));
-      expect(result.overwriteType, OverwriteType.standard);
-      expect(result.scriptId, isNull);
-      expect(harmonyProfileDefaults(result), result);
-    },
-  );
+  test('keeps manual node choices and refresh settings across restarts', () {
+    const old = Profile(
+      id: 17,
+      label: 'Existing subscription',
+      url: 'https://subscription.example/link',
+      autoUpdate: false,
+      autoUpdateDuration: Duration(days: 30),
+      overwriteType: OverwriteType.script,
+      scriptId: 12,
+      selectedMap: {'Main': 'Node'},
+    );
+    final result = harmonyProfileDefaults(old);
+    expect(result.id, old.id);
+    expect(result.label, old.label);
+    expect(result.url, old.url);
+    expect(result.selectedMap, old.selectedMap);
+    expect(result.autoUpdate, old.autoUpdate);
+    expect(result.autoUpdateDuration, old.autoUpdateDuration);
+    expect(result.overwriteType, OverwriteType.standard);
+    expect(result.scriptId, isNull);
+    expect(harmonyProfileDefaults(result), result);
+  });
 }

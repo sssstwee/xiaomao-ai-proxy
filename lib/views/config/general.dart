@@ -661,18 +661,18 @@ class ExternalControllerItem extends ConsumerWidget {
   }
 }
 
-final generalItems = <Widget>[
+List<Widget> generalItems({required bool isHarmony}) => <Widget>[
   const LogLevelItem(),
   const UaItem(),
   if (system.isDesktop) const KeepAliveIntervalItem(),
   const TestUrlItem(),
   const PortItem(),
-  const HostsItem(),
+  if (!isHarmony) const HostsItem(),
   const Ipv6Item(),
   const AllowLanItem(),
   const UnifiedDelayItem(),
-  const AppendSystemDNSItem(),
-  if (!system.isOhos) const FindProcessItem(),
+  if (!isHarmony) const AppendSystemDNSItem(),
+  if (!isHarmony) const FindProcessItem(),
   const TcpConcurrentItem(),
   const GeodataLoaderItem(),
   const ExternalControllerItem(),

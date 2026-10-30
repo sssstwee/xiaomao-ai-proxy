@@ -34,11 +34,18 @@ struct ProtectCall {
     std::promise<void> promise;
 };
 
+struct StopTunWork {
+    napi_async_work work = nullptr;
+    napi_deferred deferred = nullptr;
+};
+
 
 static char *GetValueStringUtf8(napi_env env, napi_value value) {
     size_t length = 0;
-    napi_get_value_string_utf8(env, value, nullptr, 0, &length);
+    if (napi_get_value_string_utf8(env, value, nullptr, 0, &length) != napi_ok) return nullptr;
     char *result = static_cast<char*>(malloc(length + 1));
+    if (result == nullptr) return nullptr;
+    result[0] = '\0';
     napi_get_value_string_utf8(env, value, result, length + 1, &length);
     return result;
 }
@@ -57,7 +64,7 @@ static bool GetValueBool(napi_env env, napi_value value) {
 
 static napi_value CreateValueStringUtf8(napi_env env, const char *data) {
     napi_value result = nullptr;
-    napi_create_string_utf8(env, data, NAPI_AUTO_LENGTH, &result);
+    napi_create_string_utf8(env, data == nullptr ? "" : data, NAPI_AUTO_LENGTH, &result);
     return result;
 }
 
@@ -69,6 +76,10 @@ static napi_value CreateValueInt32(napi_env env, int data) {
 
 
 void InvokeActionCallJsCallback(napi_env env, napi_value callback, void* context, void* data){
+    if (env == nullptr || callback == nullptr) {
+        free(data);
+        return;
+    }
     napi_value global = nullptr;
     napi_get_global(env, &global);
     napi_value argv = CreateValueStringUtf8(env, reinterpret_cast<char*>(data));
@@ -87,11 +98,20 @@ static napi_value ProtectCallbackFinal(napi_env env, napi_callback_info info) {
 
 void ProtectCallJsCallback(napi_env env, napi_value callback, void *context, void *data) {
     ProtectCall *call = reinterpret_cast<ProtectCall*>(data);
+    if (env == nullptr || callback == nullptr) {
+        call->promise.set_value();
+        return;
+    }
     napi_value global = nullptr;
     napi_get_global(env, &global);
     napi_value argv = CreateValueInt32(env, call->fd);
     napi_value result = nullptr;
-    napi_call_function(env, global, callback, 1, &argv, &result);
+    if (napi_call_function(env, global, callback, 1, &argv, &result) != napi_ok) {
+        napi_value exception = nullptr;
+        napi_get_and_clear_last_exception(env, &exception);
+        call->promise.set_value();
+        return;
+    }
     napi_value then = nullptr;
     napi_get_named_property(env, result, "then", &then);
     napi_value final = nullptr;
@@ -103,11 +123,20 @@ void ProtectCallJsCallback(napi_env env, napi_value callback, void *context, voi
 
 void ResolveProcessCallJsCallback(napi_env env, napi_value callback, void *context, void *data) {
     ResolveProcessCall *call = reinterpret_cast<ResolveProcessCall*>(data);
+    if (env == nullptr || callback == nullptr) {
+        call->promise.set_value(nullptr);
+        return;
+    }
     napi_value global = nullptr;
     napi_get_global(env, &global);
     napi_value argv[4] = {CreateValueInt32(env, call->protocol), CreateValueStringUtf8(env, call->source), CreateValueStringUtf8(env, call->target), CreateValueInt32(env, call->uid)};
     napi_value result = nullptr;
-    napi_call_function(env, global, callback, 4, argv, &result);
+    if (napi_call_function(env, global, callback, 4, argv, &result) != napi_ok) {
+        napi_value exception = nullptr;
+        napi_get_and_clear_last_exception(env, &exception);
+        call->promise.set_value(nullptr);
+        return;
+    }
     char *resultStr = GetValueStringUtf8(env, result);
     call->promise.set_value(resultStr);
 }
@@ -130,8 +159,10 @@ static napi_value StartTUN(napi_env env, napi_callback_info info) {
     TunInterface *tunInterface = new TunInterface();
     napi_create_threadsafe_function(env, argv[0], nullptr, CreateValueStringUtf8(env, "protect"), 0, 1, nullptr, nullptr, nullptr, ProtectCallJsCallback, &tunInterface->protect);
     napi_create_threadsafe_function(env, argv[1], nullptr, CreateValueStringUtf8(env, "resolverProcess"), 0, 1, nullptr, nullptr, nullptr, ResolveProcessCallJsCallback, &tunInterface->resolverProcess);
-    startTUN(tunInterface, GetValueInt32(env, argv[2]), GetValueStringUtf8(env, argv[3]), GetValueStringUtf8(env, argv[4]), GetValueStringUtf8(env, argv[5]));
-    return nullptr;
+    const bool started = startTUN(tunInterface, GetValueInt32(env, argv[2]), GetValueStringUtf8(env, argv[3]), GetValueStringUtf8(env, argv[4]), GetValueStringUtf8(env, argv[5]));
+    napi_value result = nullptr;
+    napi_get_boolean(env, started, &result);
+    return result;
 }
 
 static napi_value QuickSetup(napi_env env, napi_callback_info info) {
@@ -167,7 +198,9 @@ static napi_value GetTotalTraffic(napi_env env, napi_callback_info info) {
     napi_value argv[1] = {nullptr};
     napi_get_cb_info(env, info, &argc, argv, nullptr, nullptr);
     char *data = getTotalTraffic(GetValueBool(env, argv[0]));
-    return CreateValueStringUtf8(env, data);
+    napi_value result = CreateValueStringUtf8(env, data);
+    free(data);
+    return result;
 }
 
 static napi_value GetTraffic(napi_env env, napi_callback_info info) {
@@ -175,12 +208,48 @@ static napi_value GetTraffic(napi_env env, napi_callback_info info) {
     napi_value argv[1] = {nullptr};
     napi_get_cb_info(env, info, &argc, argv, nullptr, nullptr);
     char *data = getTraffic(GetValueBool(env, argv[0]));
-    return CreateValueStringUtf8(env, data);
+    napi_value result = CreateValueStringUtf8(env, data);
+    free(data);
+    return result;
+}
+
+static void ExecuteStopTun(napi_env env, void *data) {
+    stopTun();
+}
+
+static void CompleteStopTun(napi_env env, napi_status status, void *data) {
+    StopTunWork *work = static_cast<StopTunWork*>(data);
+    napi_value result = nullptr;
+    if (status == napi_ok) {
+        napi_get_undefined(env, &result);
+        napi_resolve_deferred(env, work->deferred, result);
+    } else {
+        napi_create_error(env, nullptr, CreateValueStringUtf8(env, "Stop TUN work was cancelled"), &result);
+        napi_reject_deferred(env, work->deferred, result);
+    }
+    napi_delete_async_work(env, work->work);
+    delete work;
 }
 
 static napi_value StopTun(napi_env env, napi_callback_info info) {
-    stopTun();
-    return nullptr;
+    // Go waits for JS socket callbacks while closing the TUN; keep this JS thread free.
+    StopTunWork *work = new StopTunWork();
+    napi_value promise = nullptr;
+    if (napi_create_promise(env, &work->deferred, &promise) != napi_ok) {
+        delete work;
+        return nullptr;
+    }
+    napi_status status = napi_create_async_work(env, nullptr, CreateValueStringUtf8(env, "stopTun"),
+                                               ExecuteStopTun, CompleteStopTun, work, &work->work);
+    if (status == napi_ok) status = napi_queue_async_work(env, work->work);
+    if (status != napi_ok) {
+        napi_value error = nullptr;
+        napi_create_error(env, nullptr, CreateValueStringUtf8(env, "Unable to schedule Stop TUN"), &error);
+        napi_reject_deferred(env, work->deferred, error);
+        if (work->work != nullptr) napi_delete_async_work(env, work->work);
+        delete work;
+    }
+    return promise;
 }
 
 static napi_value Suspend(napi_env env, napi_callback_info info) {
@@ -208,7 +277,7 @@ static void call_tun_interface_protect_impl(void *tun_interface, const int fd) {
     TunInterface *tunInterface = reinterpret_cast<TunInterface*>(tun_interface);
     ProtectCall call{fd, {}};
     std::future<void> future = call.promise.get_future();
-    napi_call_threadsafe_function(tunInterface->protect, &call, napi_tsfn_nonblocking);
+    if (napi_call_threadsafe_function(tunInterface->protect, &call, napi_tsfn_nonblocking) != napi_ok) return;
     future.wait();
 }
 
@@ -216,7 +285,7 @@ static char *call_tun_interface_resolve_process_impl(void *tun_interface, const 
     TunInterface *tunInterface = reinterpret_cast<TunInterface*>(tun_interface);
     ResolveProcessCall data{protocol, source, target, uid, {}};
     std::future<char*> future = data.promise.get_future();
-    napi_call_threadsafe_function(tunInterface->resolverProcess, &data, napi_tsfn_nonblocking);
+    if (napi_call_threadsafe_function(tunInterface->resolverProcess, &data, napi_tsfn_nonblocking) != napi_ok) return nullptr;
     return future.get();
 }
 
@@ -228,7 +297,7 @@ static void call_invoke_interface_result_impl(void *invoke_interface, const char
         dataCopy = static_cast<char*>(malloc(length + 1));
         std::memcpy(dataCopy, data, length + 1);
     }
-    napi_call_threadsafe_function(invokeInterface->onResult, dataCopy, napi_tsfn_nonblocking);
+    if (napi_call_threadsafe_function(invokeInterface->onResult, dataCopy, napi_tsfn_nonblocking) != napi_ok) free(dataCopy);
 }
 
 static void release_object_impl(void *obj) {

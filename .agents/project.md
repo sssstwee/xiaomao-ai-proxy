@@ -4,8 +4,9 @@ FlClash is a multi-platform proxy client based on ClashMeta (mihomo), built with
 
 ## Version Notes
 
-- `.fvmrc` pins Flutter 3.35.7 for local development.
-- CI uses Flutter 3.41.9. These may diverge; trust CI as the source of truth for release builds.
+- HarmonyOS checks use the pinned Flutter-OHOS 3.44.10 toolchain in `.github/harmony-pinned-shas.env`.
+- Local SDK discovery uses `HOS_SDK_HOME` pointing to the SDK root that contains `default/sdk-pkg.json`.
+- `.fvmrc` is local and ignored; trust the CI-pinned toolchain for parity.
 - Dart SDK constraint: `>=3.8.0 <4.0.0`.
 
 ## Build Dependencies

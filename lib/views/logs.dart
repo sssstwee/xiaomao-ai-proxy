@@ -3,6 +3,7 @@ import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/state.dart';
+import 'package:fl_clash/views/application_setting.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -116,6 +117,9 @@ class _LogsViewState extends ConsumerState<LogsView> {
   @override
   Widget build(BuildContext context) {
     final appLocalizations = context.appLocalizations;
+    final openLogs = ref.watch(
+      appSettingProvider.select((state) => state.openLogs),
+    );
     return CommonScaffold(
       actions: _buildActions(),
       onKeywordsUpdate: _onKeywordsUpdate,
@@ -140,55 +144,64 @@ class _LogsViewState extends ConsumerState<LogsView> {
           );
         },
       ),
-      body: ValueListenableBuilder<LogsState>(
-        valueListenable: _logsStateNotifier,
-        builder: (context, state, _) {
-          final logs = state.list;
-          if (logs.isEmpty) {
-            return NullStatus(
-              illustration: const LogEmptyIllustration(),
-              label: appLocalizations.nullTip(appLocalizations.logs),
-            );
-          }
-          final items = logs
-              .map<Widget>(
-                (log) => LogItem(
-                  key: Key(log.dateTime),
-                  log: log,
-                  onClick: (value) {
-                    context.commonScaffoldState?.addKeyword(value);
-                  },
-                ),
-              )
-              .separated(const Divider(height: 0))
-              .toList();
-          return Align(
-            alignment: Alignment.topCenter,
-            child: ScrollToEndBox(
-              onCancelToEnd: () {
-                _logsStateNotifier.value = _logsStateNotifier.value.copyWith(
-                  autoScrollToEnd: false,
+      body: Column(
+        children: [
+          const OpenLogsItem(),
+          const Divider(height: 0),
+          Expanded(
+            child: ValueListenableBuilder<LogsState>(
+              valueListenable: _logsStateNotifier,
+              builder: (context, state, _) {
+                final logs = state.list;
+                if (logs.isEmpty) {
+                  return NullStatus(
+                    illustration: const LogEmptyIllustration(),
+                    label: openLogs
+                        ? appLocalizations.nullTip(appLocalizations.logs)
+                        : appLocalizations.harmonyLogCaptureOff,
+                  );
+                }
+                final items = logs
+                    .map<Widget>(
+                      (log) => LogItem(
+                        key: Key(log.dateTime),
+                        log: log,
+                        onClick: (value) {
+                          context.commonScaffoldState?.addKeyword(value);
+                        },
+                      ),
+                    )
+                    .separated(const Divider(height: 0))
+                    .toList();
+                return Align(
+                  alignment: Alignment.topCenter,
+                  child: ScrollToEndBox(
+                    onCancelToEnd: () {
+                      _logsStateNotifier.value = _logsStateNotifier.value
+                          .copyWith(autoScrollToEnd: false);
+                    },
+                    controller: _scrollController,
+                    enable: state.autoScrollToEnd,
+                    dataSource: logs,
+                    child: CommonScrollBar(
+                      controller: _scrollController,
+                      child: SuperListView.builder(
+                        physics: const NextClampingScrollPhysics(),
+                        reverse: true,
+                        shrinkWrap: true,
+                        controller: _scrollController,
+                        itemBuilder: (_, index) {
+                          return items[index];
+                        },
+                        itemCount: items.length,
+                      ),
+                    ),
+                  ),
                 );
               },
-              controller: _scrollController,
-              enable: state.autoScrollToEnd,
-              dataSource: logs,
-              child: CommonScrollBar(
-                controller: _scrollController,
-                child: SuperListView.builder(
-                  physics: const NextClampingScrollPhysics(),
-                  reverse: true,
-                  shrinkWrap: true,
-                  controller: _scrollController,
-                  itemBuilder: (_, index) {
-                    return items[index];
-                  },
-                  itemCount: items.length,
-                ),
-              ),
             ),
-          );
-        },
+          ),
+        ],
       ),
     );
   }

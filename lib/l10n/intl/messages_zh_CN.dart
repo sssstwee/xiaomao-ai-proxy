@@ -322,6 +322,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "国内和内网直连，国外网络自动使用代理。",
     ),
     "harmonyChangeSubscription": MessageLookupByLibrary.simpleMessage("更换订阅"),
+    "harmonyClientHome": MessageLookupByLibrary.simpleMessage("首页"),
     "harmonyConfigCheckReasonOffline": MessageLookupByLibrary.simpleMessage(
       "网络不可用",
     ),
@@ -438,9 +439,12 @@ class MessageLookup extends MessageLookupByLibrary {
       "VPN 未能启动",
     ),
     "harmonyLatency": MessageLookupByLibrary.simpleMessage("延迟"),
+    "harmonyLogCaptureOff": MessageLookupByLibrary.simpleMessage(
+      "日志捕获已关闭，可通过上方开关收集新的日志。",
+    ),
     "harmonyLogin": MessageLookupByLibrary.simpleMessage("登录"),
     "harmonyLoginHint": MessageLookupByLibrary.simpleMessage(
-      "守护 Claude 与 Codex，登录后自动获取线路。",
+      "登录后获取订阅配置，也可直接导入自己的配置。",
     ),
     "harmonyLogout": MessageLookupByLibrary.simpleMessage("退出登录"),
     "harmonyNetworkCellular": MessageLookupByLibrary.simpleMessage("移动数据"),
@@ -449,6 +453,10 @@ class MessageLookup extends MessageLookupByLibrary {
     "harmonyNetworkWifi": MessageLookupByLibrary.simpleMessage("Wi-Fi"),
     "harmonyOfflineConfig": MessageLookupByLibrary.simpleMessage(
       "正在使用缓存配置（离线）",
+    ),
+    "harmonyOpenProfiles": MessageLookupByLibrary.simpleMessage("前往配置"),
+    "harmonyProxyEmptyHint": MessageLookupByLibrary.simpleMessage(
+      "暂无可显示的策略组，请先导入并启用配置，再检查配置中的代理组与运行模式。",
     ),
     "harmonyRateLimited": MessageLookupByLibrary.simpleMessage(
       "尝试次数过多，请一分钟后重试。",
@@ -461,6 +469,9 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "harmonyRouteReasonManual": MessageLookupByLibrary.simpleMessage("按测速结果选择"),
     "harmonyRouteReasonTcp": MessageLookupByLibrary.simpleMessage("稳定连接优先"),
+    "harmonyRoutingManaged": MessageLookupByLibrary.simpleMessage(
+      "分流与 DNS 由当前配置管理。",
+    ),
     "harmonyServiceError": MessageLookupByLibrary.simpleMessage(
       "暂时无法连接服务，请检查网络后重试。",
     ),

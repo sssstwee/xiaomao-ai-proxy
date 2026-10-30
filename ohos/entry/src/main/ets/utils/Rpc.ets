@@ -38,6 +38,10 @@ export class ChunkedSender {
 export class ChunkedReader {
   private buffers: Map<number, number[][]> = new Map<number, number[][]>()
 
+  clear(): void {
+    this.buffers.clear()
+  }
+
   read(sequence: rpc.MessageSequence): string | null {
     const sessionId = sequence.readInt()
     const isLast = sequence.readBoolean()

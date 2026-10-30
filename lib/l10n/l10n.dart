@@ -4674,10 +4674,10 @@ class AppLocalizations {
     return Intl.message('Sign in', name: 'harmonyLogin', desc: '', args: []);
   }
 
-  /// `Protecting Claude and Codex. Sign in to get your connection settings automatically.`
+  /// `Sign in to get a subscription, or import your own profile.`
   String get harmonyLoginHint {
     return Intl.message(
-      'Protecting Claude and Codex. Sign in to get your connection settings automatically.',
+      'Sign in to get a subscription, or import your own profile.',
       name: 'harmonyLoginHint',
       desc: '',
       args: [],
@@ -5459,6 +5459,51 @@ class AppLocalizations {
     return Intl.message(
       'Unable to import this config. Choose a valid config file no larger than 1 MB.',
       name: 'harmonyConfigImportFailed',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Home`
+  String get harmonyClientHome {
+    return Intl.message('Home', name: 'harmonyClientHome', desc: '', args: []);
+  }
+
+  /// `No proxy groups are available. Import and select a profile, then check its proxy groups and routing mode.`
+  String get harmonyProxyEmptyHint {
+    return Intl.message(
+      'No proxy groups are available. Import and select a profile, then check its proxy groups and routing mode.',
+      name: 'harmonyProxyEmptyHint',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Open profiles`
+  String get harmonyOpenProfiles {
+    return Intl.message(
+      'Open profiles',
+      name: 'harmonyOpenProfiles',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Log capture is off. Enable it above to collect new logs.`
+  String get harmonyLogCaptureOff {
+    return Intl.message(
+      'Log capture is off. Enable it above to collect new logs.',
+      name: 'harmonyLogCaptureOff',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Routing and DNS are managed by the selected profile.`
+  String get harmonyRoutingManaged {
+    return Intl.message(
+      'Routing and DNS are managed by the selected profile.',
+      name: 'harmonyRoutingManaged',
       desc: '',
       args: [],
     );

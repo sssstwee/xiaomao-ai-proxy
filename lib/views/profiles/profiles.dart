@@ -331,16 +331,17 @@ class ProfileItem extends StatelessWidget {
                               icon: Icons.emergency_outlined,
                               label: appLocalizations.more,
                               subItems: [
-                                PopupMenuItemData(
-                                  icon: Icons.extension_outlined,
-                                  label: appLocalizations.override,
-                                  onPressed: () {
-                                    _handlePushGenProfilePage(
-                                      context,
-                                      profile.id,
-                                    );
-                                  },
-                                ),
+                                if (!system.isOhos)
+                                  PopupMenuItemData(
+                                    icon: Icons.extension_outlined,
+                                    label: appLocalizations.override,
+                                    onPressed: () {
+                                      _handlePushGenProfilePage(
+                                        context,
+                                        profile.id,
+                                      );
+                                    },
+                                  ),
                                 // PopupMenuItemData(
                                 //   icon: Icons.extension_outlined,
                                 //   label: appLocalizations.override + "1",

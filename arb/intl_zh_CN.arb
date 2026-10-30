@@ -570,7 +570,7 @@
   "simpleNoRoute": "没有可用线路，请稍后点击连接重试。",
   "simpleConnectFailed": "启动失败，请检查 VPN 授权后重试。",
   "harmonyLogin": "登录",
-  "harmonyLoginHint": "守护 Claude 与 Codex，登录后自动获取线路。",
+  "harmonyLoginHint": "登录后获取订阅配置，也可直接导入自己的配置。",
   "harmonyUsername": "用户名",
   "harmonyLogout": "退出登录",
   "harmonyRequired": "请填写此项。",
@@ -683,5 +683,10 @@
   "harmonyImportConfig": "导入配置文件",
   "harmonyConfigImportHint": "无法下载订阅时，可导入 VPS 提供的配置文件后连接。",
   "harmonyConfigImportSuccess": "配置已导入，可以连接。",
-  "harmonyConfigImportFailed": "无法导入此配置，请选择有效的配置文件（不超过 1 MB）。"
+  "harmonyConfigImportFailed": "无法导入此配置，请选择有效的配置文件（不超过 1 MB）。",
+  "harmonyClientHome": "首页",
+  "harmonyProxyEmptyHint": "暂无可显示的策略组，请先导入并启用配置，再检查配置中的代理组与运行模式。",
+  "harmonyOpenProfiles": "前往配置",
+  "harmonyLogCaptureOff": "日志捕获已关闭，可通过上方开关收集新的日志。",
+  "harmonyRoutingManaged": "分流与 DNS 由当前配置管理。"
 }

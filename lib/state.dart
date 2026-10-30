@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:fl_clash/providers/harmony_home_display.dart';
 
 import 'package:animations/animations.dart';
 import 'package:dynamic_color/dynamic_color.dart';
@@ -331,9 +332,7 @@ class GlobalState {
       });
     };
     container.read(systemActionProvider.notifier).updateTray();
-    if (!system.isOhos) {
-      container.read(profilesActionProvider.notifier).autoUpdateProfiles();
-    }
+    container.read(profilesActionProvider.notifier).autoUpdateProfiles();
     container.read(commonActionProvider.notifier).autoCheckUpdate();
     autoLaunch?.updateStatus(container.read(appSettingProvider).autoLaunch);
     if (!container.read(appSettingProvider).silentLaunch) {
@@ -346,13 +345,12 @@ class GlobalState {
     await _showCrashlyticsTip();
     await container.read(coreActionProvider.notifier).connectCore();
     await container.read(coreActionProvider.notifier).initCore();
-    if (system.isOhos) {
-      // Native connections are started only after server authorization.
-      await container.read(setupActionProvider.notifier).updateStatus(false);
-    } else {
-      await container.read(setupActionProvider.notifier).initStatus();
-    }
+    await container.read(setupActionProvider.notifier).initStatus();
     container.read(initProvider.notifier).value = true;
+    if (system.isOhos) {
+      unawaited(container.read(harmonySimpleProvider.notifier).bootstrap());
+      unawaited(container.read(harmonyHomeDisplayProvider.notifier).refresh());
+    }
     permissions.check();
   }
 

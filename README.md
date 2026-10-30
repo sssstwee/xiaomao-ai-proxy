@@ -1,9 +1,15 @@
-# CC保镖
+# 小猫代理
 
-CC保镖 is a proxy client for HarmonyOS. CC stands for Claude and Codex, whose connections it helps protect.
+小猫代理是基于 FlClash 手机端交互与 Mihomo 的独立鸿蒙客户端。首发适配目标为 HUAWEI Pura X View（API 26），应用标识为 `com.xiaomao.proxy`。
 
-Download the HAP from [Releases](https://github.com/sssstwee/xiaomao-ai-proxy/releases). If unsigned, sign it with a HarmonyOS debug certificate and profile containing your phone’s UDID, then install it using DevEco Studio with developer mode and USB debugging enabled on your HarmonyOS phone.
+当前开发版本为 `1.0.0+2026103001`。本轮先完成代码与检查，安装包须经用户授权后由 GitHub Actions 构建；仓库现有 Releases 中的 CC保镖是历史版本。
 
-HarmonyOS checks GitHub Releases on launch, app resume, and after VPN connects. Newer build numbers under the same version also trigger the download prompt. Versions through `0.8.94+2026101502` disabled automatic checks, so install `0.8.94+2026101503` or later manually once to enable future prompts.
+- 首页、代理、配置、工具四个入口；支持多订阅、文件/二维码导入、手动节点选择、连接列表和日志。
+- Mihomo 固定最新稳定版 `v1.19.33`，复用 FlClash v0.9.2 的接口扩展，见 [内核来源与验证](core/README.md)。
+- 分流、DNS、策略组和故障切换由当前配置管理；客户端保存用户手动节点选择。
+- 可使用普通订阅或本地 YAML，也保留受管 HTTPS 订阅的安全缓存、离线导入和断开 VPN 时更新能力。
+- 新应用可与旧 CC保镖并存，使用独立数据目录。首次打开时在配置页导入配置或添加自己的订阅。
 
-Routing, proxy group order, failover and DNS are managed by the [hosted configuration](backend/README.md). Future routing changes normally require only a cloud configuration update.
+鸿蒙 HAP 必须使用匹配应用标识、包含目标设备 UDID 的有效证书与 Profile 签名后安装。签名、原生 ABI、锁屏、切网和耗电需在授权打包后进行真机验收。
+
+源码和上游版权按 [GPL-3.0](LICENSE) 交付。开发及检查命令见 [.agents/commands.md](.agents/commands.md)。

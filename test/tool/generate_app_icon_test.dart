@@ -88,8 +88,8 @@ Future<void> main() async {
     expect(background, isNot(contains('<path')));
     expect(background, contains('fill="#1765F6"'));
     expect(foreground, isNot(contains('<rect')));
-    final guardian = File('assets/images/cc_guardian.svg').readAsStringSync();
-    final artwork = RegExp(r'<g id="cc-guardian">[\s\S]*?</g>');
+    final guardian = File('assets/images/cat_awake.svg').readAsStringSync();
+    final artwork = RegExp(r'<g id="cat">[\s\S]*?</g>');
     final guardianArtwork = artwork.firstMatch(guardian)?.group(0);
     expect(guardianArtwork, isNotNull);
     expect(artwork.firstMatch(full)?.group(0), guardianArtwork);
@@ -99,7 +99,7 @@ Future<void> main() async {
       expect(source, isNot(contains('linearGradient')));
       expect(
         RegExp(r'#[0-9a-fA-F]{6}').allMatches(source).map((m) => m.group(0)),
-        everyElement(isIn(['#1765F6', '#F8FBFF'])),
+        everyElement(isIn(['#1765F6', '#FFFFFF', '#000000'])),
       );
     }
     final layeredImage = jsonDecode(

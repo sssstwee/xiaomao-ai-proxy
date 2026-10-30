@@ -4,28 +4,26 @@ import 'package:fl_clash/manager/app_manager.dart';
 import 'package:fl_clash/models/common.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/state.dart';
-import 'package:fl_clash/views/dashboard/simple.dart';
 import 'package:fl_clash/widgets/widgets.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 typedef OnSelected = void Function(int index);
 
-class HomePage extends StatelessWidget {
-  const HomePage({super.key});
+class HomePage extends ConsumerWidget {
+  final bool? isHarmony;
 
-  void _handleToPage(PageLabel pageLabel) {
-    globalState.container
-        .read(currentPageLabelProvider.notifier)
-        .toPage(pageLabel);
+  const HomePage({super.key, this.isHarmony});
+
+  void _handleToPage(PageLabel pageLabel, WidgetRef ref) {
+    ref.read(currentPageLabelProvider.notifier).toPage(pageLabel);
   }
 
   @override
-  Widget build(BuildContext context) {
-    if (system.isOhos) {
-      return const HomeBackScopeContainer(child: SimpleDashboardView());
-    }
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isHarmony = this.isHarmony ?? system.isOhos;
     return HomeBackScopeContainer(
       child: AppSidebarContainer(
         child: Material(
@@ -43,12 +41,14 @@ class HomePage extends StatelessWidget {
                       .map(
                         (e) => NavigationDestination(
                           icon: e.icon,
-                          label: Intl.message(e.label.name),
+                          label: isHarmony && e.label == PageLabel.dashboard
+                              ? context.appLocalizations.harmonyClientHome
+                              : Intl.message(e.label.name),
                         ),
                       )
                       .toList(),
                   onDestinationSelected: (index) {
-                    _handleToPage(navigationItems[index].label);
+                    _handleToPage(navigationItems[index].label, ref);
                   },
                   selectedIndex: currentIndex,
                 ),
@@ -143,14 +143,20 @@ class _HomePageViewState extends ConsumerState<_HomePageView> {
   @override
   void didUpdateWidget(covariant _HomePageView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.navigationItems.length != widget.navigationItems.length) {
+    if (!listEquals(
+      oldWidget.navigationItems.map((item) => item.label).toList(),
+      widget.navigationItems.map((item) => item.label).toList(),
+    )) {
       _updatePageController();
     }
   }
 
   int get _pageIndex {
     final pageLabel = ref.read(currentPageLabelProvider);
-    return widget.navigationItems.indexWhere((item) => item.label == pageLabel);
+    final index = widget.navigationItems.indexWhere(
+      (item) => item.label == pageLabel,
+    );
+    return index < 0 ? 0 : index;
   }
 
   Future<void> _toPage(
@@ -164,6 +170,9 @@ class _HomePageViewState extends ConsumerState<_HomePageView> {
       (item) => item.label == pageLabel,
     );
     if (index == -1) {
+      return;
+    }
+    if (!_pageController.hasClients) {
       return;
     }
     final isAnimateToPage = ref.read(appSettingProvider).isAnimateToPage;
@@ -180,8 +189,14 @@ class _HomePageViewState extends ConsumerState<_HomePageView> {
   }
 
   void _updatePageController() {
-    final pageLabel = ref.read(currentPageLabelProvider);
-    _toPage(pageLabel, true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final pageLabel = ref.read(currentPageLabelProvider);
+      final exists = widget.navigationItems.any(
+        (item) => item.label == pageLabel,
+      );
+      _toPage(exists ? pageLabel : PageLabel.dashboard, true);
+    });
   }
 
   @override
@@ -192,13 +207,10 @@ class _HomePageViewState extends ConsumerState<_HomePageView> {
 
   @override
   Widget build(BuildContext context) {
-    final itemCount = ref.watch(
-      currentNavigationItemsStateProvider.select((state) => state.value.length),
-    );
     return PageView.builder(
       controller: _pageController,
       physics: const NeverScrollableScrollPhysics(),
-      itemCount: itemCount,
+      itemCount: widget.navigationItems.length,
       itemBuilder: (context, index) {
         return widget.pageBuilder(context, index);
       },

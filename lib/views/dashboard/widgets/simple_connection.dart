@@ -41,6 +41,8 @@ class SimpleConnectionPanel extends ConsumerWidget {
   final HarmonyConfigFreshness configFreshness;
   final VoidCallback? onConfigRefresh;
   final VoidCallback? onImportConfig;
+  final VoidCallback? onOpenProxies;
+  final String? profileName;
 
   const SimpleConnectionPanel({
     super.key,
@@ -59,6 +61,8 @@ class SimpleConnectionPanel extends ConsumerWidget {
     this.configFreshness = const HarmonyConfigFreshness(),
     this.onConfigRefresh,
     this.onImportConfig,
+    this.onOpenProxies,
+    this.profileName,
   });
 
   @override
@@ -203,19 +207,29 @@ class SimpleConnectionPanel extends ConsumerWidget {
               ),
             ),
           ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            key: const Key('harmony_connection_action'),
+            onPressed: busy ? null : onToggle,
+            icon: Icon(running ? Icons.stop_rounded : Icons.play_arrow_rounded),
+            label: Text(actionLabel),
+          ),
         ],
       ),
-      'config': _ConfigFreshnessRow(
-        freshness: configFreshness,
-        configSyncInProgress: homeStatus.configSyncInProgress,
-        onRefresh: onConfigRefresh,
-      ),
+      'config': profileName != null
+          ? _ActiveProfileCard(name: profileName!, onRefresh: onConfigRefresh)
+          : _ConfigFreshnessRow(
+              freshness: configFreshness,
+              configSyncInProgress: homeStatus.configSyncInProgress,
+              onRefresh: onConfigRefresh,
+            ),
       'issue': issueWidgets.isEmpty ? null : Column(children: issueWidgets),
       'node': _NodeSection(
         nodeName:
             nodeName ??
             remoteHarmonyText(ref, 'simpleAutoRoute', texts.simpleAutoRoute),
         delayMs: nodeDelayMs,
+        onTap: onOpenProxies,
       ),
       'insights': _HomeInsightSection(homeStatus: homeStatus, running: running),
       'traffic': _TrafficCard(
@@ -234,13 +248,15 @@ class SimpleConnectionPanel extends ConsumerWidget {
           parameters: {'value': live.down.traffic.show},
         ),
       ),
-      'account': _AccountFooter(
-        username: username,
-        directSubscription: directSubscription,
-        onLogout: busy ? null : onLogout,
-        onImportConfig: busy ? null : onImportConfig,
-        showImportHint: directSubscription && hasError && !running,
-      ),
+      'account': profileName != null
+          ? null
+          : _AccountFooter(
+              username: username,
+              directSubscription: directSubscription,
+              onLogout: busy ? null : onLogout,
+              onImportConfig: busy ? null : onImportConfig,
+              showImportHint: directSubscription && hasError && !running,
+            ),
     };
     final layout = runtime['home'] as Map? ?? {};
     final sections = List<String>.from(
@@ -291,6 +307,35 @@ class SimpleConnectionPanel extends ConsumerWidget {
           children[index],
         ],
       ],
+    );
+  }
+}
+
+class _ActiveProfileCard extends StatelessWidget {
+  final String name;
+  final VoidCallback? onRefresh;
+
+  const _ActiveProfileCard({required this.name, this.onRefresh});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: EdgeInsets.zero,
+      elevation: 0,
+      color: context.colorScheme.surfaceContainerLow,
+      child: ListTile(
+        leading: const Icon(Icons.folder_open_outlined),
+        title: Text(context.appLocalizations.profile),
+        subtitle: Text(name, maxLines: 2, overflow: TextOverflow.ellipsis),
+        trailing: onRefresh == null
+            ? null
+            : IconButton(
+                key: const Key('harmony_profile_refresh'),
+                tooltip: context.appLocalizations.update,
+                onPressed: onRefresh,
+                icon: const Icon(Icons.refresh_rounded),
+              ),
+      ),
     );
   }
 }
@@ -635,52 +680,65 @@ class _HomeInsightSection extends ConsumerWidget {
 class _NodeSection extends ConsumerWidget {
   final String nodeName;
   final int? delayMs;
+  final VoidCallback? onTap;
 
-  const _NodeSection({required this.nodeName, this.delayMs});
+  const _NodeSection({required this.nodeName, this.delayMs, this.onTap});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final texts = context.appLocalizations;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            remoteHarmonyText(
-              ref,
-              'harmonyCurrentNode',
-              texts.harmonyCurrentNode,
-            ),
-            style: context.textTheme.labelMedium,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            nodeName,
-            style: context.textTheme.titleMedium,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-          if (delayMs != null && delayMs! > 0) ...[
-            const SizedBox(height: 4),
+    return InkWell(
+      key: const Key('harmony_current_node'),
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
             Text(
               remoteHarmonyText(
                 ref,
-                'harmonyLatencyValue',
-                '${remoteHarmonyText(ref, 'harmonyLatency', texts.harmonyLatency)}: $delayMs ms',
-                parameters: {
-                  'label': remoteHarmonyText(
-                    ref,
-                    'harmonyLatency',
-                    texts.harmonyLatency,
-                  ),
-                  'delay': '$delayMs',
-                },
+                'harmonyCurrentNode',
+                texts.harmonyCurrentNode,
               ),
-              style: context.textTheme.bodySmall,
+              style: context.textTheme.labelMedium,
             ),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    nodeName,
+                    style: context.textTheme.titleMedium,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                if (onTap != null) const Icon(Icons.chevron_right_rounded),
+              ],
+            ),
+            if (delayMs != null && delayMs! > 0) ...[
+              const SizedBox(height: 4),
+              Text(
+                remoteHarmonyText(
+                  ref,
+                  'harmonyLatencyValue',
+                  '${remoteHarmonyText(ref, 'harmonyLatency', texts.harmonyLatency)}: $delayMs ms',
+                  parameters: {
+                    'label': remoteHarmonyText(
+                      ref,
+                      'harmonyLatency',
+                      texts.harmonyLatency,
+                    ),
+                    'delay': '$delayMs',
+                  },
+                ),
+                style: context.textTheme.bodySmall,
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
@@ -1017,7 +1075,9 @@ class _ConnectionIndicatorState extends State<ConnectionIndicator>
                         ),
                         opacity: awake ? 1 : 0.6,
                         child: SvgPicture.asset(
-                          'assets/images/cc_guardian.svg',
+                          awake
+                              ? 'assets/images/cat_awake.svg'
+                              : 'assets/images/cat_sleeping.svg',
                           width: 56,
                           height: 56,
                           excludeFromSemantics: true,

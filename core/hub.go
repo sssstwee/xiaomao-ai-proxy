@@ -531,7 +531,7 @@ func handleSetupConfig(bytes []byte) string {
 }
 
 func init() {
-	adapter.UrlTestHook = func(url string, name string, delay uint16) {
+	adapter.UrlTestHook = func(url string, name string, delay uint16, _ bool) {
 		delayData := &Delay{
 			Url:  url,
 			Name: name,

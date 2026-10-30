@@ -22,3 +22,11 @@ index 845f4d23..a55c2f1c 100644
      );
      final depfileService = DepfileService(
        fileSystem: environment.fileSystem,
+diff --git a/packages/flutter_tools/lib/src/dart/analysis.dart b/packages/flutter_tools/lib/src/dart/analysis.dart
+--- a/packages/flutter_tools/lib/src/dart/analysis.dart
++++ b/packages/flutter_tools/lib/src/dart/analysis.dart
+@@ -156,3 +156,3 @@ class AnalysisServer {
+   void _writeMessage({required String message}) {
+-    _process?.stdin.write('Content-Length: ${message.length}\r\n\r\n$message');
++    _process?.stdin.write('Content-Length: ${utf8.encode(message).length}\r\n\r\n$message');
+   }

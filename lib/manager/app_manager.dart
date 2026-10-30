@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:fl_clash/providers/harmony_home_display.dart';
 
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/core/controller.dart';
@@ -82,6 +83,10 @@ class _AppStateManagerState extends ConsumerState<AppStateManager>
   Future<void> didChangeAppLifecycleState(AppLifecycleState state) async {
     // commonPrint.log('$state');
     if (state == AppLifecycleState.resumed) {
+      if (system.isOhos) {
+        unawaited(ref.read(harmonySimpleProvider.notifier).onAppResumed());
+        unawaited(ref.read(harmonyHomeDisplayProvider.notifier).refresh());
+      }
       permissions.check();
       render?.resume();
       final pendingCrashMessage = globalState.pendingCrashMessage;

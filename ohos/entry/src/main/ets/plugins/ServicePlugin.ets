@@ -30,11 +30,19 @@ export default class ServicePlugin implements FlutterPlugin, MethodCallHandler {
     this.channel = new MethodChannel(binding.getBinaryMessenger(), "com.follow.clash/service")
     this.channel.setMethodCallHandler(this)
     this.notificationActionSubscriber = commonEventManager.createSubscriberSync({
-      events: ['HARMONY_NOTIF_ACTION'],
+      events: ['HARMONY_NOTIF_ACTION', 'HARMONY_VPN_ERROR'],
     } as commonEventManager.CommonEventSubscribeInfo)
     commonEventManager.subscribeToEvent(this.notificationActionSubscriber, (event: commonEventManager.CommonEventData) => {
       const action = event.data ?? ''
-      if (action) this.channel?.invokeMethod('notificationAction', action)
+      if (event.event === 'HARMONY_VPN_ERROR') {
+        globalState.runTime = 0
+        globalState.runState = RunState.stop
+        this.parent.handleClearVpnNotification()
+        this.channel?.invokeMethod('crash', action)
+        publishEvent('SERVICE_STOP', '')
+      } else if (action) {
+        this.channel?.invokeMethod('notificationAction', action)
+      }
     })
   }
 
@@ -90,10 +98,12 @@ export default class ServicePlugin implements FlutterPlugin, MethodCallHandler {
   }
 
   private handleShutdown(result: MethodResult): void {
-    this.parent.handleShutdown().finally(() => {
+    this.parent.handleShutdown().then(() => {
       globalState.runTime = 0
       globalState.runState = RunState.stop
       result.success(true)
+    }).catch((err: Error) => {
+      result.error('VPN_SHUTDOWN_FAILED', err.message, null)
     })
   }
 
@@ -105,43 +115,59 @@ export default class ServicePlugin implements FlutterPlugin, MethodCallHandler {
 
   private handleInvokeAction(call: MethodCall, result: MethodResult): void {
     const callbackStub = new CallbackStub("invokeAction", (data: string) => { result.success(data) })
-    this.parent.handleInvokeAction(call.args, callbackStub)
+    this.parent.handleInvokeAction(call.args, callbackStub).catch((err: Error) => {
+      result.error('CORE_ACTION_FAILED', err.message, null)
+    })
   }
 
   private handleStart(result: MethodResult): void {
-    if (globalState.runState === RunState.stop) {
-      globalState.runState = RunState.pending
-      const options = globalState.state?.vpnOptions ?? new VpnOptions()
-      const resultStub = new ResultStub("handleStart", (runTime: number) => {
-        globalState.runTime = runTime
-        globalState.runState = runTime !== 0 ? RunState.start : RunState.stop
-      })
-      this.parent.handleStartService(options, globalState.runTime, resultStub).catch(() => {
-        globalState.runState = RunState.stop
-      })
+    globalState.runState = RunState.pending
+    let completed = false
+    const finish = (runTime: number, error: string): void => {
+      if (completed) return
+      completed = true
+      globalState.runTime = runTime
+      globalState.runState = runTime !== 0 ? RunState.start : RunState.stop
+      if (error) {
+        result.error('VPN_START_FAILED', error, null)
+      } else {
+        result.success(runTime !== 0)
+      }
     }
-    result.success(true)
+    const options = globalState.state?.vpnOptions ?? new VpnOptions()
+    const resultStub = new ResultStub('handleStart', finish)
+    this.parent.handleStartService(options, globalState.runTime, resultStub).catch((err: Error) => {
+      finish(0, err.message)
+    })
   }
 
   private handleStop(result: MethodResult): void {
-    if (globalState.runState === RunState.start) {
-      globalState.runState = RunState.pending
-      const resultStub = new ResultStub("handleStop", (runTime: number) => {
-        globalState.runTime = runTime
-        globalState.runState = RunState.stop
-      })
-      this.parent.handleStopService(resultStub).catch(() => {
-        globalState.runState = RunState.start
-      })
+    globalState.runState = RunState.pending
+    let completed = false
+    const finish = (runTime: number, error: string): void => {
+      if (completed) return
+      completed = true
+      globalState.runTime = runTime
+      globalState.runState = runTime !== 0 ? RunState.start : RunState.stop
+      if (error) {
+        result.error('VPN_STOP_FAILED', error, null)
+      } else {
+        result.success(runTime === 0)
+      }
     }
-    result.success(true)
+    const resultStub = new ResultStub('handleStop', finish)
+    this.parent.handleStopService(resultStub).catch((err: Error) => {
+      finish(0, err.message)
+    })
   }
 
   private handleGetRunTime(result: MethodResult): void {
     this.parent.handleGetRunTime().then((runTime: number) => {
       globalState.runTime = runTime
-    }).finally(() => {
-      result.success(globalState.runTime)
+      globalState.runState = runTime !== 0 ? RunState.start : RunState.stop
+      result.success(runTime)
+    }).catch((err: Error) => {
+      result.error('VPN_STATUS_FAILED', err.message, null)
     })
   }
 }

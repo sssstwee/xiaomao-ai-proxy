@@ -56,6 +56,7 @@ class _Api extends HarmonyAccountApi {
   Object? loginFailure;
   Object? logoutFailure;
   Object? commitFailure;
+  Future<void> Function()? commitHook;
   Object? restoreFailure;
   Object? versionFailure;
   Future<HarmonyConfigVersionInfo?> Function()? versionHook;
@@ -141,6 +142,7 @@ class _Api extends HarmonyAccountApi {
     HarmonyConfigCacheMetadata value, {
     required String expectedToken,
   }) async {
+    await commitHook?.call();
     if (commitFailure != null) {
       throw commitFailure!;
     }
@@ -348,12 +350,14 @@ class _ProfileActions extends ProfilesAction {
 
 class _CoreActions extends CoreAction {
   final List<String> events;
+  Future<void> Function()? readyHook;
 
   _CoreActions(this.events);
 
   @override
   Future<bool> tryStartCore([bool start = false]) async {
     events.add('core-ready');
+    await readyHook?.call();
     return false;
   }
 }
@@ -386,7 +390,7 @@ class _Setup extends SetupAction {
   Future<void> applyProfile({
     bool silence = false,
     bool force = false,
-    VoidCallback? preloadInvoke,
+    FutureOr<void> Function()? preloadInvoke,
   }) async {
     applies++;
     events.add('apply');
@@ -394,7 +398,7 @@ class _Setup extends SetupAction {
     final failure = applyFailure;
     applyFailure = null;
     if (failure != null) throw failure;
-    preloadInvoke?.call();
+    await preloadInvoke?.call();
   }
 }
 
@@ -434,6 +438,7 @@ class _Harness {
   late final files = _Files(events);
   late final profiles = _ProfileActions(events);
   late final setup = _Setup(events);
+  late final coreActions = _CoreActions(events);
   final proxies = _ProxyActions();
   final common = _CommonActions();
   final controller = _Controller();
@@ -450,7 +455,7 @@ class _Harness {
         harmonyCoreControllerProvider.overrideWithValue(controller),
         profilesProvider.overrideWith(() => _Profiles(initial)),
         profilesActionProvider.overrideWith(() => profiles),
-        coreActionProvider.overrideWith(() => _CoreActions(events)),
+        coreActionProvider.overrideWith(() => coreActions),
         setupActionProvider.overrideWith(() => setup),
         proxiesActionProvider.overrideWith(() => proxies),
         commonActionProvider.overrideWith(() => common),
@@ -1282,7 +1287,13 @@ void main() {
         expect(harness.api.requests.single.etag, isNull);
         expect(harness.state.remoteProfile, isNull);
         expect(harness.state.usingCachedConfig, isFalse);
-        expect(harness.files.deleted, contains(7));
+        if (badCache == 'wrong-account') {
+          // A display label cannot prove ownership of a user's local file.
+          expect(harness.files.deleted, isNot(contains(7)));
+          expect(harness.container.read(currentProfileIdProvider), isNull);
+        } else {
+          expect(harness.files.deleted, contains(7));
+        }
       },
     );
   }
@@ -1805,4 +1816,163 @@ void main() {
     expect(harness.state.busy, isFalse);
     expect(harness.state.disconnecting, isFalse);
   });
+  test(
+    'a local profile connects without a managed subscription account',
+    () async {
+      final personal = Profile.normal(label: 'Personal');
+      final harness = _Harness(initial: [personal]);
+      harness.api.session = null;
+      await harness.notifier.bootstrap();
+      harness.container.read(currentProfileIdProvider.notifier).value =
+          personal.id;
+
+      await harness.notifier.toggleConnect();
+
+      expect(harness.container.read(isStartProvider), isTrue);
+      expect(harness.setup.applies, 1);
+      expect(harness.setup.starts.single.profileApplied, isTrue);
+      expect(harness.api.requests, isEmpty);
+      await harness.notifier.toggleConnect();
+      expect(harness.container.read(isStartProvider), isFalse);
+    },
+  );
+
+  test('managed bootstrap retains the selected personal profile', () async {
+    final personal = Profile.normal(label: 'Personal');
+    final harness = _Harness(initial: [personal]);
+    harness.container.read(currentProfileIdProvider.notifier).value =
+        personal.id;
+    harness.api.downloads.add(HarmonyConfigDownload(bytes: _config));
+
+    await harness.notifier.bootstrap();
+
+    expect(harness.state.remoteProfile, isNotNull);
+    expect(harness.container.read(currentProfileIdProvider), personal.id);
+    expect(harness.setup.applies, 0);
+  });
+
+  test(
+    'managed background update does not switch a personal VPN profile',
+    () async {
+      final personal = Profile.normal(label: 'Personal');
+      final harness = _Harness(initial: [_profile(), personal]);
+      harness.cache();
+      harness.api.downloads.add(const HarmonyConfigDownload(notModified: true));
+      await harness.notifier.bootstrap();
+      harness.container.read(currentProfileIdProvider.notifier).value =
+          personal.id;
+      harness.container.read(runTimeProvider.notifier).value = 0;
+      harness.api.downloads.add(HarmonyConfigDownload(bytes: _config));
+
+      await harness.notifier.checkConfigVersion(force: true);
+
+      expect(harness.container.read(currentProfileIdProvider), personal.id);
+      expect(harness.setup.applies, 0);
+      expect(harness.container.read(isStartProvider), isTrue);
+    },
+  );
+
+  test('signing out of managed service preserves a personal VPN', () async {
+    final personal = Profile.normal(label: 'Personal');
+    final harness = _Harness(initial: [_profile(), personal]);
+    harness.cache();
+    harness.api.downloads.add(const HarmonyConfigDownload(notModified: true));
+    await harness.notifier.bootstrap();
+    harness.container.read(currentProfileIdProvider.notifier).value =
+        personal.id;
+    harness.container.read(runTimeProvider.notifier).value = 0;
+
+    await harness.notifier.logout();
+
+    expect(harness.container.read(currentProfileIdProvider), personal.id);
+    expect(harness.container.read(isStartProvider), isTrue);
+    expect(harness.profiles.deleted, isNot(contains(personal.id)));
+  });
+
+  test(
+    'file picker pauses resume checks until its import has completed',
+    () async {
+      final harness = _Harness(initial: [_profile()]);
+      harness.cache();
+      harness.api.downloads.add(const HarmonyConfigDownload(notModified: true));
+      await harness.notifier.bootstrap();
+      await Future<void>.delayed(Duration.zero);
+      final checks = harness.api.versionChecks;
+      harness.notifier.setConfigImportPending(true);
+
+      await harness.notifier.onAppResumed();
+      await harness.notifier.checkConfigVersion(force: true);
+
+      expect(harness.api.versionChecks, checks);
+      harness.notifier.setConfigImportPending(false);
+    },
+  );
+  test(
+    'a same-named personal file is not managed or deleted by its label',
+    () async {
+      final personal = Profile.normal(label: appDisplayName);
+      final harness = _Harness(initial: [personal]);
+      harness.container.read(currentProfileIdProvider.notifier).value =
+          personal.id;
+      harness.api.downloads.add(HarmonyConfigDownload(bytes: _config));
+
+      await harness.notifier.bootstrap();
+
+      expect(harness.state.remoteProfile?.id, isNot(personal.id));
+      expect(harness.files.bytes.containsKey(personal.id), isFalse);
+      await harness.notifier.logout();
+      expect(harness.container.read(currentProfileIdProvider), personal.id);
+      expect(harness.container.read(profilesProvider), contains(personal));
+      expect(harness.profiles.deleted, isNot(contains(personal.id)));
+    },
+  );
+
+  test(
+    'changing profile during offline proxy preparation preserves selection',
+    () async {
+      final personal = Profile.normal(label: 'Personal');
+      final harness = _Harness(
+        initial: [_profile(), personal],
+        directSubscription: true,
+      );
+      harness.cache();
+      harness.api.downloads.add(const HarmonyConfigDownload(notModified: true));
+      await harness.notifier.bootstrap();
+      await Future<void>.delayed(Duration.zero);
+      harness.api.requireOfflineProxy = true;
+      harness.api.downloads.add(HarmonyConfigDownload(bytes: _config));
+      harness.coreActions.readyHook = () async {
+        harness.container.read(currentProfileIdProvider.notifier).value =
+            personal.id;
+      };
+
+      await harness.notifier.forceRefreshConfig();
+
+      expect(harness.container.read(currentProfileIdProvider), personal.id);
+      verifyNever(() => harness.controller.startSubscriptionProxy());
+    },
+  );
+
+  test(
+    'managed rollback does not restore a superseded active profile',
+    () async {
+      final personal = Profile.normal(label: 'Personal');
+      final harness = _Harness(initial: [_profile(), personal]);
+      harness.cache();
+      harness.api.downloads.add(const HarmonyConfigDownload(notModified: true));
+      await harness.notifier.bootstrap();
+      harness.container.read(runTimeProvider.notifier).value = 0;
+      harness.api.downloads.add(HarmonyConfigDownload(bytes: _config));
+      harness.api.commitHook = () async {
+        harness.container.read(currentProfileIdProvider.notifier).value =
+            personal.id;
+      };
+      harness.api.commitFailure = StateError('Storage unavailable');
+
+      expect(await harness.notifier.forceRefreshConfig(), isFalse);
+
+      expect(harness.container.read(currentProfileIdProvider), personal.id);
+      expect(harness.setup.applies, 1);
+    },
+  );
 }

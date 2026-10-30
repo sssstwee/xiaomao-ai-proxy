@@ -6,7 +6,7 @@ import unittest
 import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[2]
-BRAND = 'CC保镖'
+BRAND = '小猫代理'
 
 
 def read(path):
@@ -30,7 +30,7 @@ class BrandingTest(unittest.TestCase):
         resource = json.loads(read('ohos/AppScope/resources/base/element/string.json'))
         names = {item['name']: item['value'] for item in resource['string']}
         self.assertEqual(names['app_name'], BRAND)
-        self.assertIn('"bundleName": "com.follow.clash.simple"', read('ohos/AppScope/app.json5'))
+        self.assertIn('"bundleName": "com.xiaomao.proxy"', read('ohos/AppScope/app.json5'))
         self.assertIn(f'currentProfileName: string = "{BRAND}"',
                       read('ohos/entry/src/main/ets/models/State.ets'))
         self.assertIn(f"this.title = '{BRAND}'",
@@ -69,14 +69,14 @@ class BrandingTest(unittest.TestCase):
     def test_current_docs_and_artifact_brand(self):
         for path in ['README_SIMPLE.md', 'README_zh_CN.md']:
             self.assertTrue(read(path).startswith(f'# {BRAND}'))
-        for path in ['README.md', 'backend/README.md']:
+        for path in ['README.md']:
             self.assertTrue(read(path).startswith(f'# {BRAND}'))
         self.assertTrue(read('.github/workflows/harmony-simple.yml').startswith(f'name: {BRAND} HarmonyOS\n'))
         self.assertIn("app_name: 'FlClash'", read('distribute_options.yaml'))
         self.assertIn("'--artifact-name',\n      artifactNameTemplate", read('setup.dart'))
-        self.assertIn('cc-bodyguard-{{build_name}}-{{platform}}', read('setup.dart'))
-        self.assertIn('cc-bodyguard-HarmonyOS', read('.github/workflows/harmony-simple.yml'))
-        self.assertIn(f"appName: '{BRAND}'", read('backend/src/auth.ts'))
+        self.assertIn('xiaomao-proxy-{{build_name}}-{{platform}}', read('setup.dart'))
+        self.assertIn('xiaomao-proxy-HarmonyOS', read('.github/workflows/harmony-simple.yml'))
+        self.assertIn("appName: 'CC保镖'", read('backend/src/auth.ts'))
 
     def test_old_product_label_absent_from_active_ui(self):
         for directory in ['lib', 'ohos', 'android', 'assets_source']:

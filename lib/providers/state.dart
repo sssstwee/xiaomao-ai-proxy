@@ -58,6 +58,7 @@ NavigationItemsState navigationItemsState(Ref ref) {
     value: navigation.getItems(
       openLogs: openLogs,
       hasProxies: !isInit ? hasProfiles : hasProxies,
+      isHarmony: system.isOhos,
     ),
   );
 }

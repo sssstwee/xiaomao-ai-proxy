@@ -155,7 +155,7 @@ abstract class CoreHandlerInterface with CoreInterface {
           method: ActionMethod.validateConfig,
           data: path,
         ) ??
-        '';
+        (throw StateError('Core did not respond to validateConfig'));
   }
 
   @override
@@ -164,7 +164,7 @@ abstract class CoreHandlerInterface with CoreInterface {
           method: ActionMethod.updateConfig,
           data: json.encode(updateParams),
         ) ??
-        '';
+        (throw StateError('Core did not respond to updateConfig'));
   }
 
   @override
@@ -179,7 +179,7 @@ abstract class CoreHandlerInterface with CoreInterface {
           method: ActionMethod.setupConfig,
           data: json.encode(setupParams),
         ) ??
-        '';
+        (throw StateError('Core did not respond to setupConfig'));
   }
 
   @override
@@ -203,7 +203,7 @@ abstract class CoreHandlerInterface with CoreInterface {
           method: ActionMethod.changeProxy,
           data: json.encode(changeProxyParams),
         ) ??
-        '';
+        (throw StateError('Core did not respond to changeProxy'));
   }
 
   @override

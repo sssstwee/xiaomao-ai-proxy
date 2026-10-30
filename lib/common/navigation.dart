@@ -1,6 +1,7 @@
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/views/views.dart';
+import 'package:fl_clash/views/dashboard/simple.dart';
 import 'package:flutter/material.dart';
 
 class Navigation {
@@ -9,21 +10,25 @@ class Navigation {
   List<NavigationItem> getItems({
     bool openLogs = false,
     bool hasProxies = false,
+    bool isHarmony = false,
   }) {
     return [
       NavigationItem(
-        keep: false,
+        keep: isHarmony,
         icon: const Icon(Icons.space_dashboard),
         label: PageLabel.dashboard,
-        builder: (_) =>
-            const DashboardView(key: GlobalObjectKey(PageLabel.dashboard)),
+        builder: (_) => isHarmony
+            ? const SimpleDashboardView(
+                key: GlobalObjectKey(PageLabel.dashboard),
+              )
+            : const DashboardView(key: GlobalObjectKey(PageLabel.dashboard)),
       ),
       NavigationItem(
         icon: const Icon(Icons.article),
         label: PageLabel.proxies,
         builder: (_) =>
             const ProxiesView(key: GlobalObjectKey(PageLabel.proxies)),
-        modes: hasProxies
+        modes: hasProxies || isHarmony
             ? [NavigationItemMode.mobile, NavigationItemMode.desktop]
             : [],
       ),
@@ -62,7 +67,7 @@ class Navigation {
         label: PageLabel.logs,
         builder: (_) => const LogsView(key: GlobalObjectKey(PageLabel.logs)),
         description: 'logsDesc',
-        modes: openLogs
+        modes: openLogs || isHarmony
             ? [NavigationItemMode.desktop, NavigationItemMode.more]
             : [],
       ),

@@ -456,6 +456,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "harmonyChangeSubscription": MessageLookupByLibrary.simpleMessage(
       "Change subscription",
     ),
+    "harmonyClientHome": MessageLookupByLibrary.simpleMessage("Home"),
     "harmonyConfigCheckReasonOffline": MessageLookupByLibrary.simpleMessage(
       "Network unavailable",
     ),
@@ -586,9 +587,12 @@ class MessageLookup extends MessageLookupByLibrary {
       "VPN did not start",
     ),
     "harmonyLatency": MessageLookupByLibrary.simpleMessage("Latency"),
+    "harmonyLogCaptureOff": MessageLookupByLibrary.simpleMessage(
+      "Log capture is off. Enable it above to collect new logs.",
+    ),
     "harmonyLogin": MessageLookupByLibrary.simpleMessage("Sign in"),
     "harmonyLoginHint": MessageLookupByLibrary.simpleMessage(
-      "Protecting Claude and Codex. Sign in to get your connection settings automatically.",
+      "Sign in to get a subscription, or import your own profile.",
     ),
     "harmonyLogout": MessageLookupByLibrary.simpleMessage("Sign out"),
     "harmonyNetworkCellular": MessageLookupByLibrary.simpleMessage("Cellular"),
@@ -601,6 +605,12 @@ class MessageLookup extends MessageLookupByLibrary {
     "harmonyNetworkWifi": MessageLookupByLibrary.simpleMessage("Wi-Fi"),
     "harmonyOfflineConfig": MessageLookupByLibrary.simpleMessage(
       "Using cached settings (offline)",
+    ),
+    "harmonyOpenProfiles": MessageLookupByLibrary.simpleMessage(
+      "Open profiles",
+    ),
+    "harmonyProxyEmptyHint": MessageLookupByLibrary.simpleMessage(
+      "No proxy groups are available. Import and select a profile, then check its proxy groups and routing mode.",
     ),
     "harmonyRateLimited": MessageLookupByLibrary.simpleMessage(
       "Too many attempts. Try again in one minute.",
@@ -618,6 +628,9 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "harmonyRouteReasonTcp": MessageLookupByLibrary.simpleMessage(
       "Stable connection first",
+    ),
+    "harmonyRoutingManaged": MessageLookupByLibrary.simpleMessage(
+      "Routing and DNS are managed by the selected profile.",
     ),
     "harmonyServiceError": MessageLookupByLibrary.simpleMessage(
       "Unable to reach the service. Check your network and try again.",

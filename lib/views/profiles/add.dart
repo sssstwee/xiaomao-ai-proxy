@@ -1,6 +1,7 @@
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/pages/scan.dart';
 import 'package:fl_clash/providers/action.dart';
+import 'package:fl_clash/providers/harmony_simple.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:flutter/material.dart';
@@ -11,9 +12,17 @@ class AddProfileView extends StatelessWidget {
   const AddProfileView({super.key, required this.context});
 
   Future<void> _handleAddProfileFormFile() async {
-    globalState.container
-        .read(profilesActionProvider.notifier)
-        .addProfileFormFile();
+    final harmony = system.isOhos
+        ? globalState.container.read(harmonySimpleProvider.notifier)
+        : null;
+    harmony?.setConfigImportPending(true);
+    try {
+      await globalState.container
+          .read(profilesActionProvider.notifier)
+          .addProfileFormFile();
+    } finally {
+      harmony?.setConfigImportPending(false);
+    }
   }
 
   Future<void> _handleAddProfileFormURL(String url) async {

@@ -3,7 +3,6 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:fl_clash/common/common.dart';
-import 'package:fl_clash/common/harmony_account.dart';
 import 'package:fl_clash/core/core.dart';
 import 'package:fl_clash/database/database.dart';
 import 'package:fl_clash/enum/enum.dart';
@@ -157,10 +156,7 @@ class SetupAction extends _$SetupAction {
     final testUrl = ref.read(
       appSettingProvider.select((state) => state.testUrl),
     );
-    return SetupParams(
-      selectedMap: system.isOhos ? const {} : selectedMap,
-      testUrl: testUrl,
-    );
+    return SetupParams(selectedMap: selectedMap, testUrl: testUrl);
   }
 
   void fullSetup() {
@@ -173,33 +169,43 @@ class SetupAction extends _$SetupAction {
 
   Future<void> _handleStart() async {
     _updateTimer?.cancel();
-    startTime ??= DateTime.now();
-    //The local status must be updated when performing the run task
-    ref.read(commonActionProvider.notifier).updateRunTime();
-    ref.read(commonActionProvider.notifier).updateTraffic();
-    if (!ref.read(suspendProvider)) {
-      await coreController.startListener();
-    } else {
-      await coreController.stopListener();
-    }
-    await app?.startBackgroundRunning();
-    _updateTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+    try {
+      if (!ref.read(suspendProvider)) {
+        if (!await coreController.startListener()) {
+          throw StateError('Core listener did not start');
+        }
+      } else {
+        await coreController.stopListener();
+      }
+      await app?.startBackgroundRunning();
+      startTime ??= DateTime.now();
       ref.read(commonActionProvider.notifier).updateRunTime();
-      ref.read(commonActionProvider.notifier).updateTraffic();
-    });
+      unawaited(ref.read(commonActionProvider.notifier).updateTraffic());
+      _updateTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+        ref.read(commonActionProvider.notifier).updateRunTime();
+        unawaited(ref.read(commonActionProvider.notifier).updateTraffic());
+      });
+    } catch (_) {
+      handleCrash();
+      rethrow;
+    }
   }
 
   Future _updateStartTime() async {
     startTime = await service?.getRunTime();
   }
 
-  Future handleStop() async {
+  Future<void> handleStop() async {
     startTime = null;
     _updateTimer?.cancel();
     _updateTimer = null;
-    await coreController.stopListener();
-    await service?.clearVpnNotification();
-    await app?.stopBackgroundRunning();
+    try {
+      await coreController.stopListener();
+    } finally {
+      ref.read(runTimeProvider.notifier).value = null;
+      await service?.clearVpnNotification();
+      await app?.stopBackgroundRunning();
+    }
   }
 
   void handleCrash() {
@@ -234,7 +240,9 @@ class SetupAction extends _$SetupAction {
     bool isInit = false,
     bool profileApplied = false,
   }) async {
-    if (isStart && system.isOhos && !harmonyAccount.isAuthorized) return;
+    if (isStart && system.isOhos && ref.read(currentProfileProvider) == null) {
+      return;
+    }
     if (isStart) {
       if (!isInit) {
         final res = await ref
@@ -259,7 +267,8 @@ class SetupAction extends _$SetupAction {
             );
           }
         } catch (_) {
-          ref.read(runTimeProvider.notifier).value = null;
+          handleCrash();
+          rethrow;
         }
       }
     } else {
@@ -324,7 +333,7 @@ class SetupAction extends _$SetupAction {
   Future<void> applyProfile({
     bool silence = false,
     bool force = false,
-    VoidCallback? preloadInvoke,
+    FutureOr<void> Function()? preloadInvoke,
   }) async {
     await _setupConfig(
       force: force,
@@ -427,22 +436,23 @@ class SetupAction extends _$SetupAction {
   Future<void> _setupConfig({
     bool force = false,
     bool silence = false,
-    VoidCallback? preloadInvoke,
+    FutureOr<void> Function()? preloadInvoke,
     FutureOr Function()? onUpdated,
   }) async {
     var profile = ref.read(currentProfileProvider);
-    final nextProfile = await profile?.checkAndUpdateAndCopy();
+    if (profile == null) return;
+    final nextProfile = await profile.checkAndUpdateAndCopy();
     if (nextProfile != null) {
       profile = nextProfile;
       ref.read(profilesProvider.notifier).put(nextProfile);
     }
-    commonPrint.log('setup ===> ${profile?.id}');
+    commonPrint.log('setup ===> ${profile.id}');
     final patchConfig = ref.read(patchClashConfigProvider);
     final res = await _requestAdmin(patchConfig.tun.enable);
     if (res.isError) return;
     final realTunEnable = ref.read(realTunEnableProvider);
     final realPatchConfig = patchConfig.copyWith.tun(enable: realTunEnable);
-    final setupState = await ref.read(setupStateProvider(profile?.id).future);
+    final setupState = await ref.read(setupStateProvider(profile.id).future);
     if (system.isAndroid || system.isOhos) {
       globalState.lastVpnState = ref.read(vpnStateProvider);
       final sharedState = ref.read(sharedStateProvider);
@@ -467,7 +477,7 @@ class SetupAction extends _$SetupAction {
             params: _setupParams,
             preloadInvoke: preloadInvoke,
           );
-          if (message.isNotEmpty && !message.endsWith('is empty')) {
+          if (message.isNotEmpty) {
             throw message;
           }
           ref.read(checkIpNumProvider.notifier).add();

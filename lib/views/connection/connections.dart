@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/core/controller.dart';
+import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:flutter/material.dart';
@@ -11,7 +12,9 @@ import 'package:super_sliver_list/super_sliver_list.dart';
 import 'item.dart';
 
 class ConnectionsView extends ConsumerStatefulWidget {
-  const ConnectionsView({super.key});
+  final Future<List<TrackerInfo>> Function()? connectionsReader;
+
+  const ConnectionsView({super.key, this.connectionsReader});
 
   @override
   ConsumerState<ConnectionsView> createState() => _ConnectionsViewState();
@@ -50,14 +53,10 @@ class _ConnectionsViewState extends ConsumerState<ConnectionsView> {
   }
 
   Future<void> _updateConnectionsTask() async {
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      if (mounted) {
-        await _updateConnections();
-        timer = Timer(const Duration(seconds: 1), () async {
-          _updateConnectionsTask();
-        });
-      }
-    });
+    if (!mounted) return;
+    await _updateConnections();
+    if (!mounted) return;
+    timer = Timer(const Duration(seconds: 1), _updateConnectionsTask);
   }
 
   @override
@@ -67,9 +66,19 @@ class _ConnectionsViewState extends ConsumerState<ConnectionsView> {
   }
 
   Future<void> _updateConnections() async {
-    _connectionsStateNotifier.value = _connectionsStateNotifier.value.copyWith(
-      trackerInfos: await coreController.getConnections(),
-    );
+    try {
+      final connections =
+          await (widget.connectionsReader?.call() ??
+              coreController.getConnections());
+      if (!mounted) return;
+      _connectionsStateNotifier.value = _connectionsStateNotifier.value
+          .copyWith(trackerInfos: connections);
+    } catch (error) {
+      commonPrint.log(
+        'updateConnections error: $error',
+        logLevel: LogLevel.warning,
+      );
+    }
   }
 
   Future<void> _handleBlockConnection(String id) async {

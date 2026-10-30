@@ -53,10 +53,8 @@ class ApplicationState extends ConsumerState<Application> {
       } else {
         exit(0);
       }
-      if (!system.isOhos) {
-        _autoUpdateProfilesTask();
-        _initLink();
-      }
+      _autoUpdateProfilesTask();
+      _initLink();
       app?.initShortcuts();
     });
   }
@@ -110,6 +108,11 @@ class ApplicationState extends ConsumerState<Application> {
       child: CoreManager(
         child: ConnectivityManager(
           onConnectivityChanged: (results) async {
+            if (system.isOhos) {
+              ref
+                  .read(harmonySimpleProvider.notifier)
+                  .reportNetworkConnectivity(results);
+            }
             commonPrint.log('connectivityChanged ${results.toString()}');
             ref.read(systemActionProvider.notifier).updateLocalIp();
             final hasVpn = results.contains(ConnectivityResult.vpn);
@@ -165,7 +168,7 @@ class ApplicationState extends ConsumerState<Application> {
           title: appDisplayName,
           locale: utils.getLocaleForString(locale),
           supportedLocales: AppLocalizations.delegate.supportedLocales,
-          themeMode: system.isOhos ? ThemeMode.system : themeProps.themeMode,
+          themeMode: themeProps.themeMode,
           theme: ThemeData(
             useMaterial3: true,
             pageTransitionsTheme: _pageTransitionsTheme,

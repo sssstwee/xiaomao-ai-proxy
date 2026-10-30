@@ -54,14 +54,20 @@ extern "C"
 JNIEXPORT jstring JNICALL
 Java_com_follow_clash_core_Core_getTraffic(JNIEnv *env, jobject thiz,
                                            const jboolean only_statistics_proxy) {
-    return new_string(getTraffic(only_statistics_proxy));
+    char *data = getTraffic(only_statistics_proxy);
+    const auto result = new_string(data);
+    free(data);
+    return result;
 }
 
 extern "C"
 JNIEXPORT jstring JNICALL
 Java_com_follow_clash_core_Core_getTotalTraffic(JNIEnv *env, jobject thiz,
                                                 const jboolean only_statistics_proxy) {
-    return new_string(getTotalTraffic(only_statistics_proxy));
+    char *data = getTotalTraffic(only_statistics_proxy);
+    const auto result = new_string(data);
+    free(data);
+    return result;
 }
 
 extern "C"

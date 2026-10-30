@@ -570,7 +570,7 @@
   "simpleNoRoute": "No route is available. Try connecting again later.",
   "simpleConnectFailed": "Could not start the proxy. Check VPN permission and try again.",
   "harmonyLogin": "Sign in",
-  "harmonyLoginHint": "Protecting Claude and Codex. Sign in to get your connection settings automatically.",
+  "harmonyLoginHint": "Sign in to get a subscription, or import your own profile.",
   "harmonyUsername": "Username",
   "harmonyLogout": "Sign out",
   "harmonyRequired": "Please fill in this field.",
@@ -683,5 +683,10 @@
   "harmonyImportConfig": "Import config file",
   "harmonyConfigImportHint": "If the subscription cannot be downloaded, import the config file from your VPS to connect.",
   "harmonyConfigImportSuccess": "Config imported. Ready to connect.",
-  "harmonyConfigImportFailed": "Unable to import this config. Choose a valid config file no larger than 1 MB."
+  "harmonyConfigImportFailed": "Unable to import this config. Choose a valid config file no larger than 1 MB.",
+  "harmonyClientHome": "Home",
+  "harmonyProxyEmptyHint": "No proxy groups are available. Import and select a profile, then check its proxy groups and routing mode.",
+  "harmonyOpenProfiles": "Open profiles",
+  "harmonyLogCaptureOff": "Log capture is off. Enable it above to collect new logs.",
+  "harmonyRoutingManaged": "Routing and DNS are managed by the selected profile."
 }

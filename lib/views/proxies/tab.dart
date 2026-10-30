@@ -129,6 +129,7 @@ class ProxiesTabViewState extends ConsumerState<ProxiesTabView>
 
   void _tabControllerListener([int? index]) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       int? groupIndex = index;
       if (groupIndex == -1) {
         return;
@@ -137,12 +138,13 @@ class ProxiesTabViewState extends ConsumerState<ProxiesTabView>
         final currentIndex = _tabController?.index;
         groupIndex = currentIndex;
       }
-      final currentGroups = getCurrentGroups();
-      if (groupIndex == null || groupIndex > currentGroups.length) {
+      final groupNames = ref.read(proxiesTabControllerStateProvider).a;
+      if (groupIndex == null ||
+          groupIndex < 0 ||
+          groupIndex >= groupNames.length) {
         return;
       }
-      final currentGroup = currentGroups[groupIndex];
-      updateCurrentGroupName(currentGroup.name);
+      updateCurrentGroupName(groupNames[groupIndex]);
     });
   }
 

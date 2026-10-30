@@ -1,6 +1,6 @@
 {
   "app": {
-    "bundleName": "com.follow.clash.simple",
+    "bundleName": "com.xiaomao.proxy",
     "vendor": "example",
     "versionCode": 1000000,
     "versionName": "1.0.0",

@@ -26,6 +26,10 @@ export default class NotificationManager {
   private openWantAgent: WantAgent | undefined
   private disconnectWantAgent: WantAgent | undefined
   private reswitchWantAgent: WantAgent | undefined
+  private continuousTaskRequested: boolean = false
+  private continuousTaskRunning: boolean = false
+  private continuousTaskStart: Promise<void> | undefined
+  private continuousTaskTimer: number | undefined
   private get lock(): Lock {
     if (!AppStorage.has('notification_lock')) AppStorage.setOrCreate('notification_lock', new Lock())
     return AppStorage.get('notification_lock') as Lock
@@ -88,13 +92,14 @@ export default class NotificationManager {
   unsubscribe(): Promise<void> {
     commonEventManager.unsubscribe(this.subscriber)
     this.clearNotification()
-    if (this.unlock) {
-      this.unlock()
-      this.unlock = undefined
-    } else {
-      this.lock.revoke(this.context.abilityInfo.name)
-    }
-    return Promise.resolve()
+    return this.stopContinuousTask().finally(() => {
+      if (this.unlock) {
+        this.unlock()
+        this.unlock = undefined
+      } else {
+        this.lock.revoke(this.context.abilityInfo.name)
+      }
+    })
   }
 
   private schedulePublish(force: boolean): void {
@@ -204,6 +209,10 @@ export default class NotificationManager {
   }
 
   private startContinuousTask(): Promise<void> {
+    if (globalState.runState !== RunState.start) return Promise.resolve()
+    this.continuousTaskRequested = true
+    if (this.continuousTaskStart) return this.continuousTaskStart
+    if (this.continuousTaskRunning) return Promise.resolve()
     const wantAgentInfo: wantAgent.WantAgentInfo = {
       wants: [{
         bundleName: this.context.applicationInfo.name,
@@ -213,20 +222,45 @@ export default class NotificationManager {
       requestCode: 0,
       actionFlags: [wantAgent.WantAgentFlags.UPDATE_PRESENT_FLAG]
     }
-    return wantAgent.getWantAgent(wantAgentInfo).then((wantAgentObj: WantAgent): Promise<void> => {
+    this.continuousTaskStart = wantAgent.getWantAgent(wantAgentInfo).then((wantAgentObj: WantAgent): Promise<void> => {
+      if (!this.continuousTaskRequested || globalState.runState !== RunState.start) return Promise.resolve()
+      backgroundTaskManager.off('continuousTaskCancel')
       backgroundTaskManager.on('continuousTaskCancel', (): void => {
-        setTimeout((): void => { void this.startContinuousTask() }, 1000)
+        this.continuousTaskRunning = false
+        if (!this.continuousTaskRequested || globalState.runState !== RunState.start) return
+        if (this.continuousTaskTimer !== undefined) clearTimeout(this.continuousTaskTimer)
+        this.continuousTaskTimer = setTimeout((): void => {
+          this.continuousTaskTimer = undefined
+          if (this.continuousTaskRequested && globalState.runState === RunState.start) void this.startContinuousTask()
+        }, 1000)
       })
       return backgroundTaskManager.startBackgroundRunning(
         this.context,
         backgroundTaskManager.BackgroundMode.TASK_KEEPING,
         wantAgentObj,
-      )
+      ).then(() => { this.continuousTaskRunning = true })
+    }).catch((err: Error) => {
+      console.error(`Start background task failed: ${err.message}`)
+    }).finally(() => {
+      this.continuousTaskStart = undefined
     })
+    return this.continuousTaskStart
   }
 
   private stopContinuousTask(): Promise<void> {
+    this.continuousTaskRequested = false
+    if (this.continuousTaskTimer !== undefined) {
+      clearTimeout(this.continuousTaskTimer)
+      this.continuousTaskTimer = undefined
+    }
     backgroundTaskManager.off('continuousTaskCancel')
-    return backgroundTaskManager.stopBackgroundRunning(this.context)
+    return (this.continuousTaskStart ?? Promise.resolve()).then((): Promise<void> => {
+      if (!this.continuousTaskRunning) return Promise.resolve()
+      return backgroundTaskManager.stopBackgroundRunning(this.context).then(() => {
+        this.continuousTaskRunning = false
+      })
+    }).catch((err: Error) => {
+      console.error(`Stop background task failed: ${err.message}`)
+    })
   }
 }

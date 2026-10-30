@@ -126,8 +126,10 @@ class HarmonySimple extends _$HarmonySimple {
   int _operation = 0;
   int _configSyncGeneration = 0;
   bool _restoring = false;
+  bool _configImportPending = false;
   Future<void>? _offlineProxyPreparation;
   final _profileInstalls = <({Profile profile, Completer<void> done})>[];
+  final _managedProfileIds = <int>{};
 
   void _ensureCurrent(int operation, String token) {
     if (!ref.mounted ||
@@ -160,7 +162,36 @@ class HarmonySimple extends _$HarmonySimple {
   @override
   HarmonySimpleState build() {
     ref.onDispose(_stopBackgroundTasks);
+    ref.listen(currentProfileIdProvider, (previous, next) {
+      if (previous == next) return;
+      state = state.copyWith(
+        clearError: true,
+        clearIssue: true,
+        usingCachedConfig: false,
+        homeStatus: HarmonyHomeStatus(
+          networkKind: state.homeStatus.networkKind,
+        ),
+      );
+    });
     return const HarmonySimpleState();
+  }
+
+  bool get _hasPersonalProfile {
+    final profile = ref.read(currentProfileProvider);
+    return profile != null &&
+        profile.id != state.remoteProfile?.id &&
+        !_managedProfileIds.contains(profile.id);
+  }
+
+  bool _canActivateManagedProfile(int id) {
+    final selected = ref.read(currentProfileIdProvider);
+    return selected == null || selected == id;
+  }
+
+  void _activateManagedProfile(int id) {
+    if (_canActivateManagedProfile(id)) {
+      ref.read(currentProfileIdProvider.notifier).value = id;
+    }
   }
 
   Future<void> bootstrap() async {
@@ -266,14 +297,22 @@ class HarmonySimple extends _$HarmonySimple {
 
   Future<void> onAppResumed() async {
     unawaited(ref.read(commonActionProvider.notifier).autoCheckUpdate());
+    if (_configImportPending) return;
     await checkSession();
     if (_api.session != null) {
       unawaited(checkConfigVersion(force: true));
     }
   }
 
+  void setConfigImportPending(bool pending) {
+    _configImportPending = pending;
+  }
+
   Future<void> reevaluateRoute() async {
-    if (state.busy || _api.session == null || !ref.read(isStartProvider)) {
+    if (state.busy ||
+        _hasPersonalProfile ||
+        _api.session == null ||
+        !ref.read(isStartProvider)) {
       return;
     }
     final operation = _operation;
@@ -441,6 +480,7 @@ class HarmonySimple extends _$HarmonySimple {
       for (final profile in _remoteProfiles()) profile.id: profile,
       for (final install in installations) install.profile.id: install.profile,
     };
+    final stopManagedConnection = !_hasPersonalProfile;
     state = state.copyWith(
       clearRemoteProfile: true,
       remoteRuntime: const {},
@@ -452,7 +492,7 @@ class HarmonySimple extends _$HarmonySimple {
       final logout = _api.logout().catchError((Object _) {
         _api.session = null;
       });
-      await _stopSafely();
+      if (stopManagedConnection) await _stopSafely();
       try {
         await logout;
       } catch (_) {
@@ -481,6 +521,10 @@ class HarmonySimple extends _$HarmonySimple {
   Future<void> retryConnect() => toggleConnect();
 
   Future<void> toggleConnect() async {
+    if (!state.busy && !_restoring && _hasPersonalProfile) {
+      await _togglePersonalProfile();
+      return;
+    }
     if (state.busy || _restoring || _api.session == null) {
       return;
     }
@@ -549,6 +593,53 @@ class HarmonySimple extends _$HarmonySimple {
     }
   }
 
+  Future<void> _togglePersonalProfile() async {
+    final profile = ref.read(currentProfileProvider);
+    if (profile == null) return;
+    final operation = ++_operation;
+    final running = ref.read(isStartProvider);
+    final setup = ref.read(setupActionProvider.notifier);
+    state = state.copyWith(
+      busy: true,
+      disconnecting: running,
+      clearError: true,
+      clearIssue: true,
+    );
+    try {
+      if (running) {
+        await setup.updateStatus(false);
+      } else {
+        await ref.read(coreActionProvider.notifier).tryStartCore();
+        if (!ref.mounted || operation != _operation) return;
+        await setup.applyProfile(force: true);
+        if (!ref.mounted ||
+            operation != _operation ||
+            ref.read(currentProfileIdProvider) != profile.id) {
+          return;
+        }
+        ref
+            .read(vpnSettingProvider.notifier)
+            .update((settings) => settings.copyWith(enable: true));
+        await setup.updateStatus(true, isInit: true, profileApplied: true);
+        if (!ref.read(isStartProvider)) {
+          throw StateError('VPN service did not start');
+        }
+      }
+    } catch (_) {
+      if (ref.mounted && operation == _operation) {
+        await _stopSafely();
+        state = state.copyWith(
+          error: currentAppLocalizations.simpleConnectFailed,
+          issue: HarmonyUserIssue.vpnStartFailed,
+        );
+      }
+    } finally {
+      if (ref.mounted && operation == _operation) {
+        state = state.copyWith(busy: false, disconnecting: false);
+      }
+    }
+  }
+
   Future<void> _connectVpn({
     required int operation,
     required String token,
@@ -574,9 +665,6 @@ class HarmonySimple extends _$HarmonySimple {
       return;
     }
     if (profile.id != ref.read(currentProfileIdProvider)) return;
-    ref
-        .read(patchClashConfigProvider.notifier)
-        .update((s) => s.copyWith(mode: Mode.rule));
     ref
         .read(vpnSettingProvider.notifier)
         .update((s) => s.copyWith(enable: true));
@@ -608,6 +696,26 @@ class HarmonySimple extends _$HarmonySimple {
   Future<bool> forceRefreshConfig({
     Map<String, String> messages = const {},
   }) async {
+    if (_hasPersonalProfile) {
+      if (state.busy) return false;
+      final profile = ref.read(currentProfileProvider)!;
+      if (profile.type == ProfileType.file) return true;
+      state = state.copyWith(busy: true, clearError: true, clearIssue: true);
+      try {
+        await ref.read(profilesActionProvider.notifier).updateProfile(profile);
+        return true;
+      } catch (_) {
+        if (ref.mounted) {
+          state = state.copyWith(
+            error: currentAppLocalizations.harmonyConfigRefreshFailed,
+            issue: HarmonyUserIssue.subscriptionUnreachable,
+          );
+        }
+        return false;
+      } finally {
+        if (ref.mounted) state = state.copyWith(busy: false);
+      }
+    }
     if (_api.session == null ||
         state.busy ||
         state.homeStatus.configSyncInProgress) {
@@ -668,6 +776,7 @@ class HarmonySimple extends _$HarmonySimple {
 
   Future<void> checkConfigVersion({bool force = false}) async {
     if (!ref.mounted ||
+        _configImportPending ||
         _api.session == null ||
         state.busy ||
         _versionCheckInFlight) {
@@ -776,6 +885,7 @@ class HarmonySimple extends _$HarmonySimple {
       final cached = await _verifiedCachedProfile(await _api.readConfigCache());
       _ensureCurrent(operation, session.token);
       if (cached == null) return null;
+      if (!_canActivateManagedProfile(cached.id)) return null;
       await _prepareOfflineProxy(cached, operation, session.token);
       _ensureCurrent(operation, session.token);
       if (ref.read(isStartProvider) || state.busy) return null;
@@ -825,6 +935,9 @@ class HarmonySimple extends _$HarmonySimple {
       }
       await ref.read(coreActionProvider.notifier).tryStartCore();
       _ensureCurrent(operation, token);
+      if (!_canActivateManagedProfile(cached.id)) {
+        throw _SupersededHarmonyOperation();
+      }
       ref.read(currentProfileIdProvider.notifier).value = cached.id;
       await ref
           .read(setupActionProvider.notifier)
@@ -992,6 +1105,7 @@ class HarmonySimple extends _$HarmonySimple {
     var stage = 'verify-cache';
     try {
       metadata = await _api.readConfigCache();
+      if (metadata != null) _managedProfileIds.add(metadata.profileId);
       cached = await _verifiedCachedProfile(metadata);
       _ensureCurrent(op, session.token);
       if (cached == null) {
@@ -1028,7 +1142,7 @@ class HarmonySimple extends _$HarmonySimple {
         final current = await _verifiedCachedProfile(metadata);
         _ensureCurrent(op, session.token);
         if (current != null && cached != null) {
-          ref.read(currentProfileIdProvider.notifier).value = current.id;
+          _activateManagedProfile(current.id);
           state = state.copyWith(
             remoteProfile: current,
             usingCachedConfig: false,
@@ -1074,6 +1188,7 @@ class HarmonySimple extends _$HarmonySimple {
           cached?.copyWith(label: appDisplayName) ??
           _remoteProfiles().firstOrNull?.copyWith(label: appDisplayName) ??
           Profile.normal(label: appDisplayName);
+      _managedProfileIds.add(target.id);
       final previousBytes = cached?.id == target.id
           ? await _files.read(target)
           : null;
@@ -1104,7 +1219,9 @@ class HarmonySimple extends _$HarmonySimple {
             );
         saved = true;
         _ensureCurrent(op, session.token);
-        if (hotApplyWhenConnected && ref.read(isStartProvider)) {
+        if (hotApplyWhenConnected &&
+            _canActivateManagedProfile(profile.id) &&
+            ref.read(isStartProvider)) {
           stage = 'apply-profile';
           ref.read(currentProfileIdProvider.notifier).value = profile.id;
           await ref
@@ -1133,7 +1250,10 @@ class HarmonySimple extends _$HarmonySimple {
         );
       } catch (_) {
         if (saved && op == _operation && _api.session?.token == session.token) {
-          ref.read(currentProfileIdProvider.notifier).value = previousId;
+          final restoreActive = ref.read(currentProfileIdProvider) == target.id;
+          if (restoreActive) {
+            ref.read(currentProfileIdProvider.notifier).value = previousId;
+          }
           if (previousBytes != null) {
             await _files.save(target, previousBytes);
             ref.read(profilesProvider.notifier).put(target);
@@ -1144,7 +1264,10 @@ class HarmonySimple extends _$HarmonySimple {
             } catch (_) {
               // Restore the live core even if database persistence is unavailable.
             }
-            if (hotApplyWhenConnected && ref.read(isStartProvider)) {
+            if (restoreActive &&
+                hotApplyWhenConnected &&
+                ref.read(currentProfileIdProvider) == previousId &&
+                ref.read(isStartProvider)) {
               await ref
                   .read(setupActionProvider.notifier)
                   .applyProfile(force: true, silence: true);
@@ -1177,7 +1300,7 @@ class HarmonySimple extends _$HarmonySimple {
         _profileInstalls.remove(install);
       }
       _ensureCurrent(op, session.token);
-      ref.read(currentProfileIdProvider.notifier).value = profile.id;
+      _activateManagedProfile(profile.id);
       stage = 'persist-refresh';
       await _api.saveConfigRefreshInterval(interval);
       _configRefreshInterval = interval;
@@ -1225,7 +1348,7 @@ class HarmonySimple extends _$HarmonySimple {
         final existing = await _verifiedCachedProfile(metadata);
         _ensureCurrent(op, session.token);
         if (existing != null) {
-          ref.read(currentProfileIdProvider.notifier).value = existing.id;
+          _activateManagedProfile(existing.id);
           state = state.copyWith(
             remoteProfile: existing,
             usingCachedConfig: true,
@@ -1258,10 +1381,10 @@ class HarmonySimple extends _$HarmonySimple {
   List<Profile> _remoteProfiles() => ref
       .read(profilesProvider)
       .where(
-        (p) =>
-            p.url.isEmpty &&
-            (p.label == appDisplayName ||
-                legacyAppDisplayNames.contains(p.label)),
+        (profile) =>
+            _managedProfileIds.contains(profile.id) ||
+            profile.id == state.remoteProfile?.id ||
+            _profileInstalls.any((install) => install.profile.id == profile.id),
       )
       .toList();
 
@@ -1316,6 +1439,7 @@ class HarmonySimple extends _$HarmonySimple {
     if (!ref.mounted || operation != _operation) {
       return;
     }
+    if (metadata != null) _managedProfileIds.add(metadata.profileId);
     var accepted = await _verifiedCachedProfile(metadata);
     if (!ref.mounted || operation != _operation) {
       return;

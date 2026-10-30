@@ -1,4 +1,4 @@
-name: CC保镖 HarmonyOS
+name: 小猫代理 HarmonyOS
 
 # Package only HarmonyOS/OHOS, through an authorized manual run on main.
 # Pushes and pull requests validate code without producing client packages.
@@ -78,6 +78,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+          fetch-depth: 0
 
       - name: Load pinned gitcode SHAs
         run: grep -v '^#' .github/harmony-pinned-shas.env >> "$GITHUB_ENV"
@@ -139,6 +140,12 @@ jobs:
       - name: Test
         run: flutter test --reporter expanded
 
+      - name: Test HarmonyOS VPN lifecycle without packaging
+        run: node --test test/native/harmony_vpn_test.cjs
+
+      - name: Check product identities
+        run: python3 -m unittest discover -s test/ci -p 'test_branding.py'
+
       - name: Set up Go bootstrap
         if: github.head_ref != 'codex/harmony-audit-fixes-github' && github.ref_name != 'codex/harmony-audit-fixes-github'
         uses: actions/setup-go@v5
@@ -146,12 +153,21 @@ jobs:
           go-version: '1.26.4'
           cache-dependency-path: core/go.sum
 
-      - name: Test core health checks
+      - name: Prepare pinned Mihomo sources
+        run: dart run core/prepare_mihomo.dart
+
+      - name: Test Mihomo integration
         if: github.head_ref != 'codex/harmony-audit-fixes-github' && github.ref_name != 'codex/harmony-audit-fixes-github'
         working-directory: core
         env:
           CGO_ENABLED: '0'
-        run: go test -mod=mod -run 'Test(DelayHonorsConfiguredHTTPStatus|SubscriptionProxy)' -count=1 .
+        run: |
+          go test -mod=readonly -tags=with_gvisor -count=1 ./...
+          go test -mod=readonly -tags='with_gvisor openharmony' github.com/metacubex/mihomo/dns
+          go vet -mod=readonly -tags=with_gvisor ./...
+
+      - name: Restore verified upstream sources after checks
+        run: dart run core/prepare_mihomo.dart --reverse
 
       - name: Set up HarmonyOS Go
         if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
@@ -187,7 +203,7 @@ jobs:
       - name: Resolve package artifact name
         if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
         id: pkg
-        run: echo "name=cc-bodyguard-HarmonyOS-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+        run: echo "name=xiaomao-proxy-HarmonyOS-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
 
       - name: Upload packages
         if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
@@ -212,7 +228,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          name: cc-bodyguard-HarmonyOS-${{ github.sha }}
+          name: xiaomao-proxy-HarmonyOS-${{ github.sha }}
           path: release-input
 
       - name: Prepare verified release assets
@@ -245,7 +261,7 @@ jobs:
         uses: softprops/action-gh-release@v3.0.3
         with:
           tag_name: ${{ steps.release.outputs.tag }}
-          name: CC保镖 ${{ steps.release.outputs.version }}
+          name: 小猫代理 ${{ steps.release.outputs.version }}
           target_commitish: ${{ github.sha }}
           make_latest: true
           fail_on_unmatched_files: true
