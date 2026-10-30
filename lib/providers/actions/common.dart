@@ -159,10 +159,12 @@ class CommonAction extends _$CommonAction {
         cancelText: isUser ? null : currentAppLocalizations.noLongerRemind,
       );
       if (res == true) {
-        unawaited(
-          launchUrl(
-            Uri.parse('https://github.com/$repository/releases/latest'),
-          ),
+        await dialogs.openUrl(
+          Uri.https(
+            'github.com',
+            '/$repository/releases/tag/${data['tag_name']}',
+          ).toString(),
+          confirm: false,
         );
       } else if (!isUser && res == false) {
         ref

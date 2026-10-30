@@ -1,7 +1,7 @@
 name: fl_clash
 description: 小猫代理，基于 FlClash v0.9.2 和 Mihomo 的鸿蒙客户端。
 publish_to: 'none'
-version: 1.0.0+2026103002
+version: 1.0.1+2026103003
 environment:
   sdk: '>=3.10.0 <4.0.0'
 

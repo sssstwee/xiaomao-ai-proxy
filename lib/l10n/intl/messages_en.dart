@@ -634,15 +634,6 @@ class MessageLookup extends MessageLookupByLibrary {
       "By installing, copying, or using the Software, you are deemed to have read and agreed to this entire statement. If you disagree with any of its terms, stop using and uninstall the Software immediately.",
     ),
     "disclaimerAcceptTitle": MessageLookupByLibrary.simpleMessage("Acceptance"),
-    "disclaimerAcknowledgeLabel": MessageLookupByLibrary.simpleMessage(
-      "I have read and understand this statement",
-    ),
-    "disclaimerAcknowledgeTip": MessageLookupByLibrary.simpleMessage(
-      "To confirm you understand, read the following statement and check the box below:",
-    ),
-    "disclaimerAcknowledgeTitle": MessageLookupByLibrary.simpleMessage(
-      "Confirm the statement",
-    ),
     "disclaimerChangesContent": MessageLookupByLibrary.simpleMessage(
       "The developers may revise this statement with any release, and the revision takes effect when that release is published. Continuing to use the Software after updating means you accept the revised statement.",
     ),
@@ -678,18 +669,6 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "disclaimerResponsibilityTitle": MessageLookupByLibrary.simpleMessage(
       "Your responsibility",
-    ),
-    "disclaimerRestateHint": MessageLookupByLibrary.simpleMessage(
-      "Enter the statement above",
-    ),
-    "disclaimerRestateMismatch": MessageLookupByLibrary.simpleMessage(
-      "Does not match the statement",
-    ),
-    "disclaimerRestateTip": MessageLookupByLibrary.simpleMessage(
-      "To confirm you understand, enter the following statement in full in the field below:",
-    ),
-    "disclaimerRestateTitle": MessageLookupByLibrary.simpleMessage(
-      "Restate the statement",
     ),
     "disclaimerSoftwareContent": MessageLookupByLibrary.simpleMessage(
       "The Software is an open-source network proxy client built on the Clash.Meta (mihomo) core. It only provides local tooling such as configuration management, rule-based routing, and traffic forwarding.",
@@ -810,6 +789,9 @@ class MessageLookup extends MessageLookupByLibrary {
       "External controller secret",
     ),
     "externalLink": MessageLookupByLibrary.simpleMessage("External link"),
+    "externalLinkOpenFailed": MessageLookupByLibrary.simpleMessage(
+      "Could not open the browser. Copy the link and open it manually.",
+    ),
     "extraLarge": MessageLookupByLibrary.simpleMessage("Extra large"),
     "fade": MessageLookupByLibrary.simpleMessage("Fade"),
     "failedCount": m28,

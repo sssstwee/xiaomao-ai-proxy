@@ -680,15 +680,6 @@ class MessageLookup extends MessageLookupByLibrary {
     "disclaimerAcceptTitle": MessageLookupByLibrary.simpleMessage(
       "Acceptation",
     ),
-    "disclaimerAcknowledgeLabel": MessageLookupByLibrary.simpleMessage(
-      "J\'ai lu et compris cette déclaration",
-    ),
-    "disclaimerAcknowledgeTip": MessageLookupByLibrary.simpleMessage(
-      "Pour confirmer que vous avez compris, lisez la déclaration suivante et cochez la case ci-dessous :",
-    ),
-    "disclaimerAcknowledgeTitle": MessageLookupByLibrary.simpleMessage(
-      "Confirmer la déclaration",
-    ),
     "disclaimerChangesContent": MessageLookupByLibrary.simpleMessage(
       "Les développeurs peuvent réviser cette déclaration à chaque version, et la révision prend effet à la publication de cette version. Continuer à utiliser le Logiciel après une mise à jour signifie que vous acceptez la déclaration révisée.",
     ),
@@ -724,18 +715,6 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "disclaimerResponsibilityTitle": MessageLookupByLibrary.simpleMessage(
       "Votre responsabilité",
-    ),
-    "disclaimerRestateHint": MessageLookupByLibrary.simpleMessage(
-      "Saisissez la déclaration ci-dessus",
-    ),
-    "disclaimerRestateMismatch": MessageLookupByLibrary.simpleMessage(
-      "Ne correspond pas à la déclaration",
-    ),
-    "disclaimerRestateTip": MessageLookupByLibrary.simpleMessage(
-      "Pour confirmer que vous avez compris, saisissez la déclaration suivante en entier dans le champ ci-dessous :",
-    ),
-    "disclaimerRestateTitle": MessageLookupByLibrary.simpleMessage(
-      "Recopier la déclaration",
     ),
     "disclaimerSoftwareContent": MessageLookupByLibrary.simpleMessage(
       "Le Logiciel est un client proxy réseau open source construit sur le cœur Clash.Meta (mihomo). Il se limite à fournir des outils locaux tels que la gestion de la configuration, le routage par règles et le transfert du trafic.",
@@ -864,6 +843,9 @@ class MessageLookup extends MessageLookupByLibrary {
       "Secret du contrôleur externe",
     ),
     "externalLink": MessageLookupByLibrary.simpleMessage("Lien externe"),
+    "externalLinkOpenFailed": MessageLookupByLibrary.simpleMessage(
+      "Impossible d’ouvrir le navigateur. Copiez le lien et ouvrez-le manuellement.",
+    ),
     "extraLarge": MessageLookupByLibrary.simpleMessage("Très grande"),
     "fade": MessageLookupByLibrary.simpleMessage("Fondu"),
     "failedCount": m28,

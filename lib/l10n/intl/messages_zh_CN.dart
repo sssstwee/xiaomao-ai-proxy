@@ -495,13 +495,6 @@ class MessageLookup extends MessageLookupByLibrary {
       "一旦你安装、复制或使用本软件，即视为你已阅读并同意本声明的全部内容。如你不同意本声明的任何条款，请立即停止使用并卸载本软件。",
     ),
     "disclaimerAcceptTitle": MessageLookupByLibrary.simpleMessage("接受声明"),
-    "disclaimerAcknowledgeLabel": MessageLookupByLibrary.simpleMessage(
-      "我已阅读并理解此声明",
-    ),
-    "disclaimerAcknowledgeTip": MessageLookupByLibrary.simpleMessage(
-      "为确认你已知悉，请阅读以下声明并勾选下方选项：",
-    ),
-    "disclaimerAcknowledgeTitle": MessageLookupByLibrary.simpleMessage("确认声明"),
     "disclaimerChangesContent": MessageLookupByLibrary.simpleMessage(
       "开发者有权随版本更新修改本声明，修改后的内容随新版本发布即生效。你在更新后继续使用本软件，即视为接受修改后的声明。",
     ),
@@ -530,14 +523,6 @@ class MessageLookup extends MessageLookupByLibrary {
     "disclaimerResponsibilityTitle": MessageLookupByLibrary.simpleMessage(
       "用户责任",
     ),
-    "disclaimerRestateHint": MessageLookupByLibrary.simpleMessage("在此输入上述声明"),
-    "disclaimerRestateMismatch": MessageLookupByLibrary.simpleMessage(
-      "与声明内容不一致",
-    ),
-    "disclaimerRestateTip": MessageLookupByLibrary.simpleMessage(
-      "为确认你已知悉，请在下方输入框中完整复述以下声明：",
-    ),
-    "disclaimerRestateTitle": MessageLookupByLibrary.simpleMessage("复述声明"),
     "disclaimerSoftwareContent": MessageLookupByLibrary.simpleMessage(
       "本软件是基于 Clash.Meta（mihomo）内核的开源网络代理客户端，仅提供配置管理、规则分流与流量转发等本地工具功能。",
     ),
@@ -629,6 +614,9 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "externalControllerSecret": MessageLookupByLibrary.simpleMessage("外部控制器密钥"),
     "externalLink": MessageLookupByLibrary.simpleMessage("外部链接"),
+    "externalLinkOpenFailed": MessageLookupByLibrary.simpleMessage(
+      "无法打开浏览器，请复制链接后手动打开。",
+    ),
     "extraLarge": MessageLookupByLibrary.simpleMessage("超大"),
     "fade": MessageLookupByLibrary.simpleMessage("淡入"),
     "failedCount": m28,

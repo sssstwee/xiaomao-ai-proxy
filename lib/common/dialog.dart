@@ -4,6 +4,7 @@ import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/widgets/widgets.dart';
+import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -253,16 +254,46 @@ class Dialogs {
     }
   }
 
-  Future<void> openUrl(String url) async {
-    final res = await showMessage(
-      message: TextSpan(text: url),
-      title: currentAppLocalizations.externalLink,
-      confirmText: currentAppLocalizations.go,
-    );
-    if (res != true) {
-      return;
+  Future<void> openUrl(String url, {bool confirm = true}) async {
+    if (confirm) {
+      final res = await showMessage(
+        message: TextSpan(text: url),
+        title: currentAppLocalizations.externalLink,
+        confirmText: currentAppLocalizations.go,
+      );
+      if (res != true) return;
     }
-    unawaited(launchUrl(Uri.parse(url)));
+    try {
+      // OHOS platformDefault opens an in-app page that this app does not host.
+      if (await launchUrl(
+        Uri.parse(url),
+        mode: LaunchMode.externalApplication,
+      )) {
+        return;
+      }
+    } catch (error) {
+      commonPrint.log(
+        'openUrl failed: ${compactError(error)}',
+        logLevel: LogLevel.warning,
+      );
+    }
+    final copy = await showMessage(
+      title: currentAppLocalizations.externalLink,
+      message: TextSpan(
+        text: '${currentAppLocalizations.externalLinkOpenFailed}\n\n$url',
+      ),
+      confirmText: currentAppLocalizations.copyLink,
+    );
+    if (copy == true) {
+      try {
+        await Clipboard.setData(ClipboardData(text: url));
+      } catch (_) {
+        showNotifier(
+          currentAppLocalizations.clipboardWriteFailed,
+          level: MessageLevel.error,
+        );
+      }
+    }
   }
 }
 
