@@ -6,7 +6,9 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:fl_clash/common/constant.dart';
 import 'package:fl_clash/common/request.dart';
+import 'package:fl_clash/state.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 class _StalledHttpClient extends Fake implements HttpClient {
   @override
@@ -118,6 +120,84 @@ void main() {
       });
 
       await expectLater(request.latestRelease(), throwsA(isA<DioException>()));
+    });
+  });
+
+  group('checkForUpdate', () {
+    setUp(() {
+      globalState.packageInfo = PackageInfo(
+        appName: '小猫代理',
+        packageName: 'com.xiaomao.proxy',
+        version: '1.0.0',
+        buildNumber: '2026103002',
+      );
+    });
+
+    Request requestWithRelease(String tag, {required bool isOhos}) {
+      return Request(isOhos: isOhos)
+        ..dio.httpClientAdapter = _HostAdapter({
+          'api.github.com': () => ResponseBody.fromString(
+            jsonEncode({'tag_name': tag}),
+            200,
+            headers: {
+              Headers.contentTypeHeader: [Headers.jsonContentType],
+            },
+          ),
+        });
+    }
+
+    test('does not offer the installed HarmonyOS build again', () async {
+      final request = requestWithRelease('v1.0.0+2026103002', isOhos: true);
+
+      expect(await request.checkForUpdate(), isNull);
+    });
+
+    test('offers a newer HarmonyOS build with the same version name', () async {
+      final request = requestWithRelease('v1.0.0+2026103003', isOhos: true);
+
+      expect(await request.checkForUpdate(), {'tag_name': 'v1.0.0+2026103003'});
+    });
+
+    test('does not offer an older HarmonyOS build', () async {
+      final request = requestWithRelease('v1.0.0+2026103001', isOhos: true);
+
+      expect(await request.checkForUpdate(), isNull);
+    });
+
+    test('still offers a higher HarmonyOS version name', () async {
+      final request = requestWithRelease('v1.0.1+1', isOhos: true);
+
+      expect(await request.checkForUpdate(), {'tag_name': 'v1.0.1+1'});
+    });
+
+    test('keeps a missing HarmonyOS build number comparable', () async {
+      globalState.packageInfo = PackageInfo(
+        appName: '小猫代理',
+        packageName: 'com.xiaomao.proxy',
+        version: '1.0.0',
+        buildNumber: '',
+      );
+      final request = requestWithRelease('v1.0.0', isOhos: true);
+
+      expect(await request.checkForUpdate(), isNull);
+    });
+
+    test('keeps the version-only comparison on other platforms', () async {
+      final request = requestWithRelease('v1.0.0+2026103002', isOhos: false);
+
+      expect(await request.checkForUpdate(), {'tag_name': 'v1.0.0+2026103002'});
+    });
+
+    test('keeps an already embedded build number on other platforms', () async {
+      globalState.packageInfo = PackageInfo(
+        appName: 'FlClash',
+        packageName: 'com.follow.clash',
+        version: '1.0.0+2026103002',
+        buildNumber: '1',
+      );
+      final request = requestWithRelease('v1.0.0+2026103002', isOhos: false);
+
+      expect(await request.checkForUpdate(), isNull);
     });
   });
 

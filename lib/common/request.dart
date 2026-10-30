@@ -16,12 +16,13 @@ class Request {
   String? userAgent;
 
   ProviderReader? _read;
+  final bool _isOhos;
 
   void attach(ProviderReader read) {
     _read = read;
   }
 
-  Request() {
+  Request({bool? isOhos}) : _isOhos = isOhos ?? system.isOhos {
     dio = Dio(BaseOptions(headers: {'User-Agent': browserUa}));
     _clashDio = Dio();
     _clashDio.httpClientAdapter = IOHttpClientAdapter(
@@ -89,7 +90,13 @@ class Request {
   Future<Map<String, dynamic>?> checkForUpdate() async {
     final release = await latestRelease();
     final remoteVersion = release['tag_name'] as String;
-    final version = globalState.packageInfo.version;
+    final packageInfo = globalState.packageInfo;
+    final version =
+        _isOhos &&
+            !packageInfo.version.contains('+') &&
+            packageInfo.buildNumber.isNotEmpty
+        ? '${packageInfo.version}+${packageInfo.buildNumber}'
+        : packageInfo.version;
     final hasUpdate =
         compareVersions(remoteVersion.replaceAll('v', ''), version) > 0;
     return hasUpdate ? release : null;
