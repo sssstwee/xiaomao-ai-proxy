@@ -40,7 +40,6 @@ class GoBuilder {
       if (config.coreVersion != version) {
         throw StateError('OHOS core_version must match the pinned $version.');
       }
-      prepareOhosModule(corePath: _corePath);
     }
     final outDir = p.join(
       _outputPath,
@@ -156,7 +155,7 @@ class GoBuilder {
 
   List<String> _buildArguments(Target target, {String? outFile}) => [
     'build',
-    if (target.isOhos) ...['-modfile=.ohos.mod', '-buildmode=c-shared'],
+    if (target.isOhos) '-buildmode=c-shared',
     '-ldflags=${_ldflags()}',
     '-tags=${config.tags}',
     if (outFile != null) ...['-o', outFile],
@@ -237,7 +236,6 @@ class GoBuilder {
       'go',
       [
         'list',
-        if (target.isOhos) '-modfile=.ohos.mod',
         '-deps',
         '-tags=${config.tags}',
         '-f',

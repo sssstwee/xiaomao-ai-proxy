@@ -27,41 +27,53 @@ remain the basis of this port.
 
 ## Go toolchain compatibility
 
-The upstream `core/go.mod` remains **Go 1.27.0**. The available OHOS Go fork is
-on Go 1.26, so `prepare_ohos_modfile.dart` generates ignored `.ohos.mod` and
-`.ohos.sum` files. Only the main module's Go directive changes to `1.26.0`;
-dependency versions and replacements are copied unchanged. A different upstream
-Go requirement requires explicit compatibility review.
+The upstream `core/go.mod` remains **Go 1.27.0**. The build uses the actual
+`openharmony/arm64` target from `sysit/ohos-go` v1.27.2-ohos-beta1, pinned at
+`2a25fe67d7aa22202944297f7c8c6a64f49be194`. This community prerelease includes
+the port's network-interface memory/file-descriptor leak fixes; Mihomo itself
+remains the stable v1.19.33 release. No compatibility module or dependency
+downgrade is used. `GOTOOLCHAIN=local` prevents automatic replacement with an
+unadapted official toolchain.
 
-Go 1.26.4 compiled and passed the full portable Core tests and the OHOS-tagged
-Core tests. This establishes the current source/API compatibility, not the
-OHOS runtime or dynamic-library ABI. The OHOS build uses `GOTOOLCHAIN=local`
-with the separately pinned OHOS Go 1.26 toolchain, preventing an automatic
-switch to an unadapted official Go toolchain.
+The port intentionally exposes `runtime.GOOS == "linux"` while its build target
+is `openharmony`. The wrapper's `onOhos` build constant controls socket protection,
+the native UID API threshold and system-clock restrictions, so those paths do
+not depend on the runtime identity. The SDK's absolute compiler wrapper supplies
+the OHOS target, sysroot and `-D__MUSL__`.
+
+Earlier Go 1.26.4 portability tests used a generated compatibility module and
+passed, but the SIG's pinned Go 1.26 source did not actually register an OHOS
+target. The first package attempt stopped at `go env` before compiling a client
+library. That obsolete compatibility helper and its build paths are removed.
 
 ## Completed checks
 
-- `CGO_ENABLED=0` portable Core tests on Go 1.26.4 with the compatibility module.
+- `CGO_ENABLED=0` portable Core tests on Go 1.27.2 with the unchanged module.
 - Full `with_gvisor openharmony` Core tests, including refused socket protection,
   native API-26 UID lookup and UID-rule matching; `core/tun` and `core/platform`
   compile under the same tags.
 - OHOS-tagged `go vet`, plus Android/arm64 cross-vet of `core`, `mobile`, `tun`
   and `platform`, preserving the upstream Android path.
+- The SHA256-verified v1.27.2-ohos-beta1 Darwin arm64 toolchain archive passed
+  `go env` and `go tool dist list` checks for the real `openharmony/arm64`
+  target, then `go list -deps` and CGO-enabled cross-vet of `core`, `tun`,
+  `platform` and `ohos` with the SDK compiler and an isolated Go build cache.
+  Its package selection includes the mobile wrapper, `platform_ohos.go` and
+  both `ohos/main.go` and `bridge.c`; desktop IPC is excluded.
 - 93 targeted Flutter tests across Core library lifecycle, controller,
   protocol contracts and the service transport.
-- 50 full setup-hook tests passed from the root dependency resolution, including source lock/check/apply/reverse,
-  compatibility-module generation, the arm64 OHOS target and hook selection.
+- 48 setup-hook tests cover source lock/check/apply/reverse, the arm64 OHOS
+  target and hook selection using the root dependency resolution.
 - Targeted Dart analysis of the adapted Core, service and setup hook: no issues.
 
 The Go checks are reproducible without building a client:
 
 ```sh
 dart core/prepare_mihomo.dart
-dart core/prepare_ohos_modfile.dart
 cd core
-GOTOOLCHAIN=go1.26.4 CGO_ENABLED=0 go test -mod=readonly -modfile=.ohos.mod -tags='with_gvisor openharmony' . ./tun ./platform
-GOTOOLCHAIN=go1.26.4 CGO_ENABLED=0 go vet -mod=readonly -modfile=.ohos.mod -tags='with_gvisor openharmony' . ./tun ./platform
-GOTOOLCHAIN=go1.26.4 GOOS=android GOARCH=arm64 CGO_ENABLED=0 go vet -mod=readonly -modfile=.ohos.mod -tags=with_gvisor . ./mobile ./tun ./platform
+GOTOOLCHAIN=go1.27.2 CGO_ENABLED=0 go test -mod=readonly -tags='with_gvisor openharmony' . ./tun ./platform
+GOTOOLCHAIN=go1.27.2 CGO_ENABLED=0 go vet -mod=readonly -tags='with_gvisor openharmony' . ./tun ./platform
+GOTOOLCHAIN=go1.27.2 GOOS=android GOARCH=arm64 CGO_ENABLED=0 go vet -mod=readonly -tags=with_gvisor . ./mobile ./tun ./platform
 cd ..
 dart core/prepare_mihomo.dart --reverse
 ```
@@ -79,9 +91,9 @@ The authorized OHOS build will call:
 dart run plugins/setup/setup_hooks/bin/build_ohos.dart /path/to/repository
 ```
 
-`GOROOT`/`PATH` must select the pinned OHOS Go 1.26; `OHOS_SDK_HOME` points to
+`GOROOT`/`PATH` must select the pinned OHOS Go 1.27 port; `OHOS_SDK_HOME` points to
 the SDK's `default/openharmony` directory. The entry prepares the locked sources
-and compatibility module, builds only the arm64 shared-library target, and
+without rewriting `go.mod`, builds only the arm64 shared-library target, and
 copies `libclash.so`, generated `libclash.h`, and `bridge.h` to the OHOS host's
 ABI directories. The explicit entry and Flutter hook share the build cache.
 The OHOS target has no desktop Helper, so the explicit Go entry returns before

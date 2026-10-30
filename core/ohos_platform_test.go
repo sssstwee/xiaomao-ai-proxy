@@ -7,6 +7,7 @@ import (
 	"net"
 	"testing"
 
+	"github.com/metacubex/mihomo/config"
 	"github.com/metacubex/mihomo/constant"
 	"github.com/metacubex/mihomo/listener/sing_tun"
 	rule "github.com/metacubex/mihomo/rules/common"
@@ -37,6 +38,18 @@ func (socket testOhosSocket) Control(callback func(uintptr)) error {
 }
 func (testOhosSocket) Read(func(uintptr) bool) error  { return nil }
 func (testOhosSocket) Write(func(uintptr) bool) error { return nil }
+
+func TestOhosNeverWritesTheSystemClock(t *testing.T) {
+	if systemTimeWritable {
+		t.Fatal("OHOS must not rely on runtime.GOOS to permit system clock writes")
+	}
+	cfg := withPlatformLimits(&config.Config{
+		NTP: &config.NTP{Enable: true, WriteToSystem: true},
+	})
+	if !cfg.NTP.Enable || cfg.NTP.WriteToSystem {
+		t.Fatal("OHOS must keep NTP enabled without writing the system clock")
+	}
+}
 
 func TestOhosRefusedSocketProtectionFailsTheDial(t *testing.T) {
 	callbacks := &testOhosCallbacks{}

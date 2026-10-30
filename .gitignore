@@ -80,10 +80,6 @@ devtools_options.yaml
 .fvmrc
 /coverage/lcov.info
 
-# Generated OHOS Go compatibility module; dependencies stay in core/go.mod.
-/core/.ohos.mod
-/core/.ohos.sum
-
 # HarmonyOS native release intermediates
 /ohos/core/libs/
 /ohos/core/src/main/cpp/includes/
@@ -93,3 +89,13 @@ devtools_options.yaml
 
 # The OHOS SDK recreates this obsolete CocoaPods file on a macOS host.
 /macos/Podfile
+
+# Private state retained from the hosted configuration backend.
+/env.local.json
+*.secrets.json
+**/private-config*.json
+/backend/node_modules/
+/backend/.wrangler/
+/backend/.dev.vars*
+/backend/.env*
+/backend/wrangler.local.jsonc

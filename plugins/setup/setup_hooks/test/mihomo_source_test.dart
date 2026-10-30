@@ -69,42 +69,6 @@ void main() {
 
   tearDown(() => core.deleteSync(recursive: true));
 
-  test(
-    'OHOS compatibility keeps upstream dependencies and source unchanged',
-    () {
-      const original =
-          'module core\n\ngo 1.27.0\n\nrequire example.org/dep v1.2.3\n';
-      final goMod = File(p.join(core.path, 'go.mod'))
-        ..writeAsStringSync(original);
-      File(
-        p.join(core.path, 'go.sum'),
-      ).writeAsStringSync('dependency checksum\n');
-
-      final path = prepareOhosModule(corePath: core.path);
-
-      expect(
-        File(path).readAsStringSync(),
-        original.replaceFirst('1.27.0', '1.26.0'),
-      );
-      expect(goMod.readAsStringSync(), original);
-      expect(
-        File(p.join(core.path, '.ohos.sum')).readAsStringSync(),
-        'dependency checksum\n',
-      );
-      expect(prepareOhosModule(corePath: core.path), path);
-    },
-  );
-
-  test('a new upstream Go requirement requires compatibility review', () {
-    File(
-      p.join(core.path, 'go.mod'),
-    ).writeAsStringSync('module core\n\ngo 1.28.0\n');
-    File(p.join(core.path, 'go.sum')).writeAsStringSync('');
-
-    expect(() => prepareOhosModule(corePath: core.path), throwsStateError);
-    expect(File(p.join(core.path, '.ohos.mod')).existsSync(), isFalse);
-  });
-
   test('check verifies clean sources without applying the patch', () {
     expect(prepareMihomo(corePath: core.path, checkOnly: true), 'v1.19.33');
     expect(existing.readAsStringSync(), 'base\n');
