@@ -45,6 +45,9 @@ void main() {
     () {
       final target = Target.resolve(platform: 'ohos', goarch: 'arm64');
       expect(target, Target.ohosArm64);
+      expect(target.goos, 'openharmony');
+      expect(target.platformDir, 'ohos');
+      expect(target.goarch, 'arm64');
       expect(target.isOhos, isTrue);
       expect(target.abi, 'arm64-v8a');
       expect(target.hasHelper, isFalse);

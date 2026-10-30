@@ -4,27 +4,6 @@ import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as p;
 
-String prepareOhosModule({required String corePath}) {
-  final source = File(p.join(corePath, 'go.mod')).readAsStringSync();
-  final directive = RegExp(r'^go 1\.27\.0$', multiLine: true);
-  if (!directive.hasMatch(source)) {
-    throw StateError(
-      'Review the OHOS Go compatibility module for this upstream Go version.',
-    );
-  }
-  final module = File(p.join(corePath, '.ohos.mod'));
-  final content = source.replaceFirst(directive, 'go 1.26.0');
-  if (!module.existsSync() || module.readAsStringSync() != content) {
-    module.writeAsStringSync(content, flush: true);
-  }
-  final sum = File(p.join(corePath, '.ohos.sum'));
-  final sumContent = File(p.join(corePath, 'go.sum')).readAsStringSync();
-  if (!sum.existsSync() || sum.readAsStringSync() != sumContent) {
-    sum.writeAsStringSync(sumContent, flush: true);
-  }
-  return module.path;
-}
-
 /// Prepares only the audited OHOS changes on the pinned FlClash core.
 ///
 /// The submodule stays on a publicly fetchable commit. Repeated preparation is

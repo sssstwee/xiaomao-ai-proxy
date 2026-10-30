@@ -17,9 +17,8 @@ Prepare sources and run the Go tests without packaging a client:
 ```bash
 dart core/prepare_mihomo.dart --check
 dart core/prepare_mihomo.dart
-dart core/prepare_ohos_modfile.dart
 cd core
-GOTOOLCHAIN=go1.26.4 CGO_ENABLED=0 go test -mod=readonly -modfile=.ohos.mod -tags='with_gvisor openharmony' . ./tun ./platform
+GOTOOLCHAIN=go1.27.2 CGO_ENABLED=0 go test -mod=readonly -tags='with_gvisor openharmony' . ./tun ./platform
 cd ..
 dart core/prepare_mihomo.dart --reverse
 ```
@@ -32,8 +31,10 @@ at a remotely fetchable commit and can return to a clean checkout after checks.
 Go tests do not verify the HarmonyOS dynamic-library ABI or phone VPN lifecycle.
 Those require a separately authorized package build and signed-device testing.
 
-The upstream module keeps Go 1.27.0. The generated OHOS module changes only that
-directive to Go 1.26.0 for the available OHOS toolchain; dependency versions are
-unchanged. Current evidence and remaining device checks are recorded in
+The upstream module keeps Go 1.27.0. The OHOS build uses the pinned
+`sysit/ohos-go` v1.27.2-ohos-beta1 port with its real `openharmony/arm64` target,
+without a compatibility module or dependency downgrades. The official SIG's
+Go 1.26 branch does not register this target and cannot replace the port.
+Current evidence and remaining device checks are recorded in
 `verification/latest-core.md` at the repository root. Use direct `dart <script>`
 for preparation: `dart run` can execute the repository's client build hooks.

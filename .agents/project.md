@@ -7,7 +7,9 @@ FlClash is a multi-platform proxy client based on ClashMeta (mihomo), built with
 This fork ports the complete official FlClash v0.9.2 source to native HarmonyOS.
 The authoritative workflow is `.github/workflows/harmony-simple.yml`:
 Flutter OHOS 3.47.7+ohos-0.0.1-pre (Dart 3.13.5), Mihomo v1.19.33,
-OHOS Go 1.26, Rust 1.92.0. Flutter OHOS is a community prerelease toolchain;
+OHOS Go 1.27.2-ohos-beta1, Rust 1.92.0. The Go toolchain is the pinned
+`sysit/ohos-go` release archive, verified by SHA-256 and actual target registration;
+the main module remains Go 1.27 without a compatibility modfile. Flutter OHOS is a community prerelease toolchain;
 application/core version stability does not imply toolchain stability.
 UI dependencies with OHOS enum additions live under `third_party/`, with
 source archive hashes, licenses and patches retained. Shared pub-cache is not patched.

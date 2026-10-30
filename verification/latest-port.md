@@ -12,7 +12,7 @@
 | 产品标识 | 小猫代理（暂定），`com.xiaomao.proxy`，`1.0.0+2026103002` |
 | 首发设备 | 已只读连接的 HUAWEI Pura X View / VOL-AL00，内部系统 API 26 |
 | Flutter | 社区 Flutter-OHOS `3.47.7+ohos-0.0.1-pre`，Dart 3.13.5 |
-| 原生工具链 | 固定 OHOS Go 1.26 分支；Rust 1.92.0 的官方 OHOS 目标 |
+| 原生工具链 | 固定 sysit/ohos-go v1.27.2-ohos-beta1 发布物（源提交及归档 SHA-256 均固定）；Rust 1.92.0 的官方 OHOS 目标 |
 
 保留官方最新版的完整手机端架构、仪表盘、代理、配置、工具和编辑器功能，以平台适配接入
 鸿蒙。Go Mihomo 继续承担代理和规则执行；C/C++、ArkTS 负责原生 VPN、套接字保护与系统交互；
@@ -30,7 +30,7 @@
 | 移动界面定向测试 | 136 项通过，涵盖首页导航、仪表盘、网络设置、扫码、工具及平台布局；与根回归有重叠 |
 | OHOS 文件选择器 | 5 项真实通道格式测试通过 |
 | Core/Dart 定向测试 | 93 项通过；与根回归有重叠 |
-| Go | Go 1.26.4 下 portable/OHOS 标签测试、vet 与 Android arm64 cross-vet 通过 |
+| Go | Go 1.27 下 portable/OHOS 标签测试、vet 与 Android arm64 cross-vet 通过 |
 | 构建工具测试 | 50 项完整构建工具测试通过，没有执行客户端构建 |
 | ArkTS VPN 生命周期 | 24 项通过，执行实际 ETS 源码，SDK/通道使用替身 |
 | 原生 C/C++ | 当前 cgo 头文件与 OHOS arm64 SDK 的语法检查通过，没有链接客户端库 |

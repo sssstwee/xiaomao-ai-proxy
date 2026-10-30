@@ -76,22 +76,21 @@ jobs:
         run: node --test test/native/harmony_vpn_test.cjs
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.26.4'
+          go-version: '1.27.2'
           cache-dependency-path: core/go.sum
       - name: Prepare pinned Mihomo sources
         run: |
           dart core/prepare_mihomo.dart
-          dart core/prepare_ohos_modfile.dart
-      - name: Test Go core with HarmonyOS-compatible compiler
+      - name: Test Go core with the upstream Go 1.27 compiler
         working-directory: core
         env:
           CGO_ENABLED: '0'
           GOTOOLCHAIN: local
         run: |
-          go test -mod=readonly -modfile=.ohos.mod -tags=with_gvisor ./...
-          go test -mod=readonly -modfile=.ohos.mod -tags='with_gvisor openharmony' . ./tun ./platform
-          go vet -mod=readonly -modfile=.ohos.mod -tags=with_gvisor ./...
-          go vet -mod=readonly -modfile=.ohos.mod -tags='with_gvisor openharmony' . ./tun ./platform
+          go test -mod=readonly -tags=with_gvisor ./...
+          go test -mod=readonly -tags='with_gvisor openharmony' . ./tun ./platform
+          go vet -mod=readonly -tags=with_gvisor ./...
+          go vet -mod=readonly -tags='with_gvisor openharmony' . ./tun ./platform
       - name: Restore verified upstream sources
         run: dart core/prepare_mihomo.dart --reverse
       - name: Test build harness with the pinned root dependencies
@@ -106,17 +105,24 @@ jobs:
         env:
           RUSTUP_TOOLCHAIN: '1.92.0'
         run: cargo test --locked --manifest-path plugins/rust_api/rust/Cargo.toml --lib
-      - name: Set up HarmonyOS Go for authorized package run
+      - name: Set up verified HarmonyOS Go for authorized package run
         if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
         run: |
           set -euo pipefail
           OHOS_GO_DIR="$RUNNER_TOOL_CACHE/ohos-go"
-          git init "$OHOS_GO_DIR"
-          git -C "$OHOS_GO_DIR" remote add origin https://gitcode.com/openharmony-sig/ohos_golang_go.git
-          git -C "$OHOS_GO_DIR" fetch --depth 1 origin "$OHOS_GO_SHA"
-          git -C "$OHOS_GO_DIR" checkout FETCH_HEAD
-          cd "$OHOS_GO_DIR/src"
-          ./make.bash
+          OHOS_GO_ARCHIVE="$RUNNER_TEMP/ohos-go.tar.gz"
+          curl --fail --location --retry 3 \
+            "https://github.com/sysit/ohos-go/releases/download/$OHOS_GO_RELEASE/go1.27.2-ohos-beta1-linux-amd64.tar.gz" \
+            -o "$OHOS_GO_ARCHIVE"
+          printf '%s  %s\n' "$OHOS_GO_ARCHIVE_SHA256" "$OHOS_GO_ARCHIVE" | sha256sum --check
+          mkdir -p "$OHOS_GO_DIR"
+          tar -xzf "$OHOS_GO_ARCHIVE" -C "$OHOS_GO_DIR" --strip-components=1
+          test "$(cat "$OHOS_GO_DIR/VERSION")" = 'go1.27.2-ohos'
+          export GOROOT="$OHOS_GO_DIR"
+          export GOTOOLCHAIN=local
+          "$OHOS_GO_DIR/bin/go" version
+          "$OHOS_GO_DIR/bin/go" tool dist list | grep -Fx 'openharmony/arm64'
+          GOOS=openharmony GOARCH=arm64 GOTOOLCHAIN=local "$OHOS_GO_DIR/bin/go" env GOOS GOARCH
           echo "GOROOT=$OHOS_GO_DIR" >> "$GITHUB_ENV"
           echo "$OHOS_GO_DIR/bin" >> "$GITHUB_PATH"
       - name: Build unsigned HarmonyOS packages
