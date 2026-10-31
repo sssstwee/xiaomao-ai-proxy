@@ -2,7 +2,9 @@ package core
 
 import (
 	"github.com/metacubex/mihomo/component/resolver"
+	"github.com/metacubex/mihomo/constant"
 	"github.com/metacubex/mihomo/dns"
+	"github.com/metacubex/mihomo/tunnel"
 	"github.com/metacubex/mihomo/tunnel/statistic"
 )
 
@@ -58,6 +60,13 @@ func handleClearDnsCache() {
 // TCP gives up on it, and so do the DNS clients' pooled connections.
 func handleResetNetwork() {
 	handleCloseConnections()
+	// Closing a stream leaves Hy2's shared QUIC socket alive on the old network.
+	// Its Close resets that reusable transport, unlike terminal protocol clients.
+	for _, proxy := range tunnel.AllProxies() {
+		if proxy.Type() == constant.Hysteria2 {
+			_ = proxy.Close()
+		}
+	}
 	handleClearDnsCache()
 }
 
