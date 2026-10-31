@@ -16,7 +16,7 @@ struct WidgetCard {
     .width('100%')
     .backgroundColor($r('sys.color.comp_background_primary'))
     .onAppear(() => {
-      this.title = '小猫代理'
+      this.title = '野猫代理'
       postCardAction(this, {  
         action: 'call',
         bundleName: 'com.xiaomao.proxy',

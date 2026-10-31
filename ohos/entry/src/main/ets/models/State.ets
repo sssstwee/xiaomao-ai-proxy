@@ -44,7 +44,7 @@ export class State {
   startTip: string = "Starting VPN..."
   stopTip: string = "Stopping VPN..."
   localNetworkTip: string = ''
-  currentProfileName: string = "小猫代理"
+  currentProfileName: string = "野猫代理"
   stopText: string = "Stop"
   onlyStatisticsProxy: boolean = false
   showStopAction: boolean = true

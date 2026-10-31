@@ -2,15 +2,15 @@
   "string": [
     {
       "name": "widget_desc",
-      "value": "Show connection status and open Xiaomao Proxy"
+      "value": "Show connection status and open Wildcat Proxy"
     },
     {
       "name": "module_desc",
-      "value": "Xiaomao Proxy client"
+      "value": "Wildcat Proxy client"
     },
     {
       "name": "EntryAbility_desc",
-      "value": "Xiaomao Proxy main screen"
+      "value": "Wildcat Proxy main screen"
     },
     {
       "name": "TempAbility_desc",
@@ -58,7 +58,7 @@
     },
     {
       "name": "widget_display_name",
-      "value": "小猫代理"
+      "value": "野猫代理"
     }
   ]
 }

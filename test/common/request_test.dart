@@ -126,7 +126,7 @@ void main() {
   group('checkForUpdate', () {
     setUp(() {
       globalState.packageInfo = PackageInfo(
-        appName: '小猫代理',
+        appName: '野猫代理',
         packageName: 'com.xiaomao.proxy',
         version: '1.0.0',
         buildNumber: '2026103002',
@@ -172,7 +172,7 @@ void main() {
 
     test('keeps a missing HarmonyOS build number comparable', () async {
       globalState.packageInfo = PackageInfo(
-        appName: '小猫代理',
+        appName: '野猫代理',
         packageName: 'com.xiaomao.proxy',
         version: '1.0.0',
         buildNumber: '',

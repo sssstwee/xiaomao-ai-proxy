@@ -2,15 +2,15 @@
   "string": [
     {
       "name": "widget_desc",
-      "value": "显示代理连接状态并打开小猫代理"
+      "value": "显示代理连接状态并打开野猫代理"
     },
     {
       "name": "module_desc",
-      "value": "小猫代理客户端"
+      "value": "野猫代理客户端"
     },
     {
       "name": "EntryAbility_desc",
-      "value": "小猫代理主界面"
+      "value": "野猫代理主界面"
     },
     {
       "name": "TempAbility_desc",
@@ -58,7 +58,7 @@
     },
     {
       "name": "widget_display_name",
-      "value": "小猫代理"
+      "value": "野猫代理"
     }
   ]
 }

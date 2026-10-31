@@ -8,7 +8,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 class _RealHttpOverrides extends HttpOverrides {}
 
 final _localizedPackageInfo = PackageInfo(
-  appName: '小猫代理',
+  appName: '野猫代理',
   packageName: 'com.xiaomao.proxy',
   version: '1.0.0',
   buildNumber: '2026103002',
@@ -25,7 +25,7 @@ void main() {
         _localizedPackageInfo.ua.codeUnits.every((unit) => unit < 128),
         isTrue,
       );
-      expect(_localizedPackageInfo.appName, '小猫代理');
+      expect(_localizedPackageInfo.appName, '野猫代理');
     });
 
     test('is accepted as an actual HttpClient request header', () async {
