@@ -503,7 +503,7 @@ test('a pending notification cannot publish after it was cleared', async () => {
   const agent = deferred();
   const f = fixture({ wantAgent: () => agent.promise, fakeTimers: true });
   const manager = notificationManager(f);
-  manager.applyParams(JSON.stringify({ phase: 'connected', title: '小猫代理', content: '', configHint: '', showActions: false }));
+  manager.applyParams(JSON.stringify({ phase: 'connected', title: '野猫代理', content: '', configHint: '', showActions: false }));
   const publish = manager.publishNow();
   manager.clearNotification();
   agent.resolve({});

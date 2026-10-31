@@ -1,4 +1,4 @@
-name: 小猫代理 HarmonyOS
+name: 野猫代理 HarmonyOS
 
 on:
   push:
@@ -215,7 +215,7 @@ jobs:
         uses: softprops/action-gh-release@v3.0.3
         with:
           tag_name: ${{ steps.release.outputs.tag }}
-          name: 小猫代理 ${{ steps.release.outputs.version }}
+          name: 野猫代理 ${{ steps.release.outputs.version }}
           target_commitish: ${{ github.sha }}
           make_latest: true
           fail_on_unmatched_files: true
