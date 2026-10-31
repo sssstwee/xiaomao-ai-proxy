@@ -7,11 +7,16 @@ export default class PowerManager {
   subscribe(callback: (idle: boolean) => void): Promise<void> {
     if (this.subscription) return this.subscription
     const subscriber = commonEventManager.createSubscriberSync({
-      events: [commonEventManager.Support.COMMON_EVENT_DEVICE_IDLE_MODE_CHANGED]
+      events: [
+        commonEventManager.Support.COMMON_EVENT_DEVICE_IDLE_MODE_CHANGED,
+        commonEventManager.Support.COMMON_EVENT_SCREEN_ON,
+      ]
     } as commonEventManager.CommonEventSubscribeInfo)
     this.subscriber = subscriber
     this.subscription = commonEventManager.subscribeToEvent(subscriber, (commonEventData: commonEventManager.CommonEventData) => {
-      if (this.subscriber === subscriber) callback(commonEventData.parameters?.sleeping === true)
+      if (this.subscriber !== subscriber) return
+      callback(commonEventData.event !== commonEventManager.Support.COMMON_EVENT_SCREEN_ON &&
+        (commonEventData.parameters?.sleeping === true || commonEventData.parameters?.napped === true))
     }).catch((err: Error) => {
       this.subscriber = undefined
       this.subscription = undefined

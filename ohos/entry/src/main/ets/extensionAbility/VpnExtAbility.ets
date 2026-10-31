@@ -7,6 +7,7 @@ import { AccessControlMode, VpnOptions } from '../models/State'
 import { ChunkedSender, ChunkedReader } from '../utils/Rpc'
 import AbilityConstant from '@ohos.app.ability.AbilityConstant';
 import NetworkManager from '../managers/NetworkManager'
+import PowerManager from '../managers/PowerManager'
 import { publishEvent } from '../utils/Event'
 
 const IPV4_ADDRESS = "172.19.0.1/30"
@@ -15,6 +16,29 @@ const DNS = "172.19.0.2"
 const DNS6 = "fdfe:dcba:9876::2"
 const NET_ANY = "0.0.0.0"
 const NET_ANY6 = "::"
+
+interface WakeProbeResult {
+  error?: string
+}
+
+interface WakeProbeArguments {
+  url: string
+  timeout: number
+}
+
+interface WakeProbeCall {
+  method: string
+  arguments: WakeProbeArguments
+}
+
+interface WakeProbeResponse {
+  result?: WakeProbeResult
+  error?: WakeProbeError
+}
+
+interface WakeProbeError {
+  message: string
+}
 
 export enum RPCType{
   invokeMethod,
@@ -92,6 +116,9 @@ export default class VpnExtAbility extends VpnExtensionAbility {
   private protectFailurePending: boolean = false
   private intentRevision: number = 0
   private networkManager: NetworkManager | undefined
+  private powerManager: PowerManager | undefined
+  private recoveryTimer: number | undefined
+  private recovery: Promise<void> | undefined
   private runTime: number = 0
   private sender: ChunkedSender = new ChunkedSender()
   private uidBundleNameMap: Map<number, string> = new Map<number, string>()
@@ -100,6 +127,7 @@ export default class VpnExtAbility extends VpnExtensionAbility {
     this.destroyed = false
     this.vpnConnection = vpnExtension.createVpnConnection(this.context)
     this.networkManager = new NetworkManager()
+    this.powerManager = new PowerManager()
   }
 
   onDestroy(): void {
@@ -276,6 +304,46 @@ export default class VpnExtAbility extends VpnExtensionAbility {
     })
   }
 
+  private checkNetwork(): Promise<boolean> {
+    const call: WakeProbeCall = { method: 'probe', arguments: { url: '', timeout: 3000 } }
+    return new Promise<boolean>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('Wake probe did not answer')), 8000)
+      try {
+        invokeMethod((data: string): void => {
+          clearTimeout(timer)
+          try {
+            const response = JSON.parse(data) as WakeProbeResponse
+            if (response.error || !response.result) {
+              throw new Error(response.error?.message ?? 'Wake probe was not executed')
+            }
+            resolve(!response.result.error)
+          } catch (err) { reject(err) }
+        }, JSON.stringify(call))
+      } catch (err) {
+        clearTimeout(timer)
+        reject(err)
+      }
+    })
+  }
+
+  private scheduleRecovery(): void {
+    if (this.destroyed || this.runTime === 0 || this.recoveryTimer !== undefined || this.recovery) return
+    const revision = this.intentRevision
+    this.recoveryTimer = setTimeout((): void => {
+      this.recoveryTimer = undefined
+      if (this.destroyed || this.runTime === 0 || revision !== this.intentRevision) return
+      this.recovery = this.checkNetwork().then((healthy: boolean): void => {
+        if (healthy || this.destroyed || this.runTime === 0 || revision !== this.intentRevision) return
+        resetNetwork()
+      }).catch((err: Error) => {
+        console.error(`Wake recovery failed: ${err.message}`)
+      }).finally(() => {
+        this.recovery = undefined
+        if (revision !== this.intentRevision) this.scheduleRecovery()
+      })
+    }, 500)
+  }
+
   private protectSocket(socketFd: number): Promise<void> {
     const vpnConnection = this.vpnConnection
     if (!vpnConnection) return Promise.reject(new Error('VPN connection is unavailable'))
@@ -300,6 +368,10 @@ export default class VpnExtAbility extends VpnExtensionAbility {
   private async stopService(): Promise<void> {
     this.runTime = 0
     this.uidBundleNameMap.clear()
+    if (this.recoveryTimer !== undefined) {
+      clearTimeout(this.recoveryTimer)
+      this.recoveryTimer = undefined
+    }
     let error = ''
     if (this.tunStarted) {
       try {
@@ -308,6 +380,7 @@ export default class VpnExtAbility extends VpnExtensionAbility {
       } catch (err) { error = `Stop TUN failed: ${err}` }
     }
     try { await this.networkManager?.unsubscribe() } catch (err) { error = error || `Network cleanup failed: ${err}` }
+    try { await this.powerManager?.unsubscribe() } catch (err) { error = error || `Power cleanup failed: ${err}` }
     if (this.vpnCreated) {
       try {
         await this.vpnConnection?.destroy()
@@ -349,6 +422,9 @@ export default class VpnExtAbility extends VpnExtensionAbility {
           if (!this.tunStarted) throw new Error('Mihomo TUN initialization failed')
         }
         await this.networkManager?.subscribe(updateDns, resetNetwork)
+        await this.powerManager?.subscribe((idle: boolean): void => {
+          if (!idle) this.scheduleRecovery()
+        })
         if (this.destroyed || revision !== this.intentRevision) throw new Error('VPN startup was superseded')
         this.runTime = runTime > 0 ? runTime : Date.now()
         this.sendResult(remote, this.runTime)

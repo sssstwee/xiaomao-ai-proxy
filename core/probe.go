@@ -253,9 +253,13 @@ type probeRequest struct {
 }
 
 func handleProbe(params *ProbeParams) *ProbeResult {
+	url := params.Url
+	if url == "" {
+		url = currentTestURL()
+	}
 	return runProbe(context.Background(), probeRequest{
 		method:    http.MethodGet,
-		url:       params.Url,
+		url:       url,
 		proxyName: params.ProxyName,
 		headers:   params.Headers,
 		timeout:   timeoutFromMillis(params.Timeout, defaultProbeTimeout),

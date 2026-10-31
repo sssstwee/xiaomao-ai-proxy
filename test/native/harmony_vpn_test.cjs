@@ -35,7 +35,7 @@ const deferred = () => {
 const tick = () => new Promise((resolve) => setImmediate(resolve));
 
 function fixture(overrides = {}) {
-  const calls = { create: [], destroy: 0, startTun: 0, stopTun: 0, dns: [], events: [], nets: [], subscribers: [], backgroundStart: 0, backgroundStop: 0, networkReset: 0, notificationPublish: 0, channels: new Map() };
+  const calls = { create: [], destroy: 0, startTun: 0, stopTun: 0, dns: [], events: [], nets: [], subscribers: [], probes: [], backgroundStart: 0, backgroundStop: 0, networkReset: 0, notificationPublish: 0, channels: new Map() };
   const vpn = {
     create: (config) => { calls.create.push(config); return overrides.create?.(config) ?? Promise.resolve(42); },
     destroy: () => { calls.destroy++; return overrides.destroy?.() ?? Promise.resolve(); },
@@ -96,9 +96,9 @@ function fixture(overrides = {}) {
     '@kit.BasicServicesKit': {
       deviceInfo: { sdkApiVersion: 26 },
       commonEventManager: {
-        Support: { COMMON_EVENT_DEVICE_IDLE_MODE_CHANGED: 'idle' },
+        Support: { COMMON_EVENT_DEVICE_IDLE_MODE_CHANGED: 'idle', COMMON_EVENT_SCREEN_ON: 'screen-on' },
         createSubscriberSync: (options) => { const subscriber = { options }; calls.subscribers.push(subscriber); return subscriber; },
-        subscribeToEvent: (subscriber, callback) => { subscriber.callback = callback; return Promise.resolve(); },
+        subscribeToEvent: (subscriber, callback) => { subscriber.callback = callback; return overrides.subscribe?.() ?? Promise.resolve(); },
         unsubscribe: (subscriber, callback) => { subscriber.unsubscribeCount = (subscriber.unsubscribeCount ?? 0) + 1; callback?.(); },
         publish: (event, options, callback) => { calls.events.push({ event, data: options.data }); callback(); },
       },
@@ -117,7 +117,13 @@ function fixture(overrides = {}) {
       startTUN: (...args) => { calls.startTun++; calls.protect = args[0]; calls.startTunArgs = args; return overrides.startTun ?? true; },
       stopTun: () => { calls.stopTun++; return overrides.stopTun?.(); },
       suspend() {}, updateDns: (value) => calls.dns.push(value),
-      setEventListener() {}, invokeMethod() {}, quickSetup() {}, forceGC() {}, resetNetwork: () => calls.networkReset++,
+      setEventListener() {},
+      invokeMethod: (callback, data) => {
+        calls.probes.push(JSON.parse(data));
+        if (overrides.probe) overrides.probe(callback);
+        else callback(JSON.stringify({ result: { 'status-code': 204 } }));
+      },
+      quickSetup() {}, forceGC() {}, resetNetwork: () => calls.networkReset++,
     },
   };
   const fileMocks = new Map([
@@ -355,6 +361,162 @@ test('physical network transitions reset latest Mihomo network state even with u
   net.handlers.netLost({ netId: 1 });
   net.handlers.netAvailable({ netId: 2 });
   assert.equal(f.calls.networkReset, 3);
+});
+
+function wakeSubscriber(f) {
+  return f.calls.subscribers.find((subscriber) => subscriber.options.events.includes('idle'));
+}
+
+async function fireTimers(f) {
+  const pending = [...f.timers.entries()];
+  for (const [id, callback] of pending) {
+    if (f.timers.delete(id)) callback();
+  }
+  await tick();
+}
+
+test('same-network wake recovers a failed route without reconnecting the VPN', async () => {
+  const f = fixture({ fakeTimers: true, probe: (reply) => reply(JSON.stringify({ result: { 'status-code': 0, error: 'timeout' } })) });
+  f.ability.handleStartService(f.vpnOptions(), 1234, f.remote());
+  await f.ability.operation;
+  const power = wakeSubscriber(f);
+  power.callback({ event: 'idle', parameters: { sleeping: true } });
+  assert.equal(f.timers.size, 0);
+  power.callback({ event: 'idle', parameters: { sleeping: false } });
+  await fireTimers(f);
+  assert.deepEqual(f.calls.probes, [{ method: 'probe', arguments: { url: '', timeout: 3000 } }]);
+  assert.equal(f.calls.networkReset, 1);
+  assert.equal(f.calls.create.length, 1);
+  assert.equal(f.calls.stopTun, 0);
+  assert.equal(f.ability.runTime, 1234);
+});
+
+test('screen-on covers a missed idle event and coalesces repeated wake events', async () => {
+  let reply;
+  const f = fixture({ fakeTimers: true, probe: (callback) => { reply = callback; } });
+  f.ability.handleStartService(f.vpnOptions(), 1234, f.remote());
+  await f.ability.operation;
+  const power = wakeSubscriber(f);
+  assert.ok(power.options.events.includes('screen-on'));
+  power.callback({ event: 'screen-on' });
+  power.callback({ event: 'idle', parameters: { sleeping: false } });
+  assert.equal(f.timers.size, 1);
+  await fireTimers(f);
+  power.callback({ event: 'screen-on' });
+  assert.equal(f.calls.probes.length, 1);
+  reply(JSON.stringify({ result: { 'status-code': 401 } }));
+  await tick();
+  assert.equal(f.calls.networkReset, 0);
+  assert.equal(f.timers.size, 0);
+});
+
+test('napping and sleeping never tear down an allowed background connection', async () => {
+  const f = fixture({ fakeTimers: true });
+  f.ability.handleStartService(f.vpnOptions(), 1234, f.remote());
+  await f.ability.operation;
+  const power = wakeSubscriber(f);
+  power.callback({ event: 'idle', parameters: { napped: true, sleeping: false } });
+  power.callback({ event: 'idle', parameters: { sleeping: true } });
+  assert.equal(f.timers.size, 0);
+  assert.equal(f.calls.probes.length, 0);
+  assert.equal(f.calls.networkReset, 0);
+});
+
+test('stop cancels pending wake work and retires its power observer', async () => {
+  const f = fixture({ fakeTimers: true });
+  f.ability.handleStartService(f.vpnOptions(), 1234, f.remote());
+  await f.ability.operation;
+  const oldPower = wakeSubscriber(f);
+  oldPower.callback({ event: 'screen-on' });
+  f.ability.handleStopService(f.remote());
+  await f.ability.operation;
+  assert.equal(f.timers.size, 0);
+  assert.equal(oldPower.unsubscribeCount, 1);
+  f.ability.handleStartService(f.vpnOptions(), 2000, f.remote());
+  await f.ability.operation;
+  oldPower.callback({ event: 'screen-on' });
+  await fireTimers(f);
+  assert.equal(f.calls.probes.length, 0);
+});
+
+test('late failed wake probes cannot reset a stopped, restarted or destroyed service', async () => {
+  for (const action of ['stop', 'restart', 'destroy']) {
+    let reply;
+    const f = fixture({ fakeTimers: true, probe: (callback) => { reply = callback; } });
+    f.ability.handleStartService(f.vpnOptions(), 1234, f.remote());
+    await f.ability.operation;
+    wakeSubscriber(f).callback({ event: 'screen-on' });
+    await fireTimers(f);
+    if (action === 'destroy') f.ability.onDestroy();
+    else f.ability.handleStopService(f.remote());
+    await f.ability.operation;
+    if (action === 'restart') {
+      f.ability.handleStartService(f.vpnOptions(), 2000, f.remote());
+      await f.ability.operation;
+    }
+    reply(JSON.stringify({ result: { 'status-code': 0, error: 'failed' } }));
+    await tick();
+    assert.equal(f.calls.networkReset, 0, action);
+  }
+});
+
+test('a duplicate start during a wake probe rechecks the latest running intent', async () => {
+  const replies = [];
+  const f = fixture({ fakeTimers: true, probe: (reply) => replies.push(reply) });
+  f.ability.handleStartService(f.vpnOptions(), 1234, f.remote());
+  await f.ability.operation;
+  wakeSubscriber(f).callback({ event: 'screen-on' });
+  await fireTimers(f);
+  f.ability.handleStartService(f.vpnOptions(), 0, f.remote());
+  await f.ability.operation;
+  replies[0](JSON.stringify({ result: { error: 'timeout' } }));
+  await tick();
+  assert.equal(f.calls.networkReset, 0);
+  await fireTimers(f);
+  replies[1](JSON.stringify({ result: { error: 'timeout' } }));
+  await tick();
+  assert.equal(f.calls.networkReset, 1);
+  assert.equal(f.calls.create.length, 1);
+  assert.equal(f.calls.stopTun, 0);
+});
+
+test('core RPC errors and missing probe slots do not count as a failed network', async () => {
+  for (const response of [{ error: { message: 'Core unavailable' } }, { result: null }]) {
+    const f = fixture({ fakeTimers: true, probe: (reply) => reply(JSON.stringify(response)) });
+    f.ability.handleStartService(f.vpnOptions(), 1234, f.remote());
+    await f.ability.operation;
+    wakeSubscriber(f).callback({ event: 'screen-on' });
+    await fireTimers(f);
+    assert.equal(f.calls.networkReset, 0);
+    assert.equal(f.ability.recovery, undefined);
+    assert.equal(f.timers.size, 0);
+  }
+});
+
+test('a lost core reply releases wake recovery so the next wake can retry', async () => {
+  const f = fixture({ fakeTimers: true, probe() {} });
+  f.ability.handleStartService(f.vpnOptions(), 1234, f.remote());
+  await f.ability.operation;
+  wakeSubscriber(f).callback({ event: 'screen-on' });
+  await fireTimers(f);
+  await fireTimers(f);
+  assert.equal(f.calls.networkReset, 0);
+  assert.equal(f.ability.recovery, undefined);
+  wakeSubscriber(f).callback({ event: 'screen-on' });
+  await fireTimers(f);
+  assert.equal(f.calls.probes.length, 2);
+  await fireTimers(f);
+});
+
+test('power observer failure rolls startup back rather than leaking the VPN', async () => {
+  const f = fixture({ subscribe: () => Promise.reject(new Error('Power observer unavailable')) });
+  const remote = f.remote();
+  f.ability.handleStartService(f.vpnOptions(), 1234, remote);
+  await f.ability.operation;
+  assert.equal(remote.results[0][0], 0);
+  assert.match(remote.results[0][1], /Power observer unavailable/);
+  assert.equal(f.calls.stopTun, 1);
+  assert.equal(f.calls.destroy, 1);
 });
 
 function servicePlugin(f, parent) {

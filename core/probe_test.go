@@ -31,6 +31,24 @@ func withProbeProxies(t *testing.T, names ...string) {
 	t.Cleanup(func() { tunnel.UpdateProxies(nil, nil) })
 }
 
+func TestHandleProbeUsesTheConfiguredTestURLWhenOmitted(t *testing.T) {
+	server := probeServer(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})
+	previous := testURL.Load()
+	testURL.Store(&server.URL)
+	t.Cleanup(func() { testURL.Store(previous) })
+	withProbeProxies(t, "node-a")
+
+	result := handleProbe(&ProbeParams{ProxyName: "node-a", Timeout: 2000})
+	if result == nil || result.Error != "" || result.StatusCode != http.StatusNoContent {
+		t.Fatalf("configured wake probe = %+v", result)
+	}
+	if result.Url != server.URL {
+		t.Errorf("probe URL = %q, want configured %q", result.Url, server.URL)
+	}
+}
+
 func TestHandleProbePinsTheNamedProxy(t *testing.T) {
 	var userAgent string
 	server := probeServer(t, func(w http.ResponseWriter, r *http.Request) {
