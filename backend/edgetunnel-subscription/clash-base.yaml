@@ -24,7 +24,7 @@ dns:
   direct-nameserver: *direct-dns
   direct-nameserver-follow-policy: false
   nameserver: &overseas-dns
-    - https://1.1.1.1/dns-query#☁️ CloudFlareCDN
+    - https://cloudflare-dns.com/dns-query#☁️ CloudFlareCDN
     - https://8.8.8.8/dns-query#☁️ CloudFlareCDN
   nameserver-policy:
     '+.cloudflare-ech.com': *direct-dns
