@@ -18,4 +18,6 @@ https://raw.githubusercontent.com/sssstwee/xiaomao-ai-proxy/main/backend/edgetun
 
 先验证生成的完整订阅能被已安装的 Mihomo 加载，再刷新客户端。Clash Verge 的扩展脚本和应用 DNS 设置不得覆盖这份订阅的 DNS；端口、TUN 等平台运行设置继续由客户端管理。现有十节点、反代路径和 TLS/ECH 参数不由这些模板修改。此模板面向 Mihomo，其他内核须单独验证。
 
+私有转换服务的版本、缓存、systemd 单元与回退方式见 [转换后端部署说明](converter/README.md)。转换后端的私密地址仅保存在 EdgeTunnel 后台 SUBAPI 中。
+
 参考：[Mihomo DNS 配置](https://wiki.metacubex.one/config/dns/)、[subconverter 外部配置](https://github.com/tindy2013/subconverter/blob/master/README-cn.md#外部配置)。
