@@ -8,7 +8,7 @@ DNS 使用 [MetaCubeX/meta-rules-dat](https://github.com/MetaCubeX/meta-rules-da
 
 `direct-nameserver` 为实际选择直连的连接单独使用国内 DoH，且不跟随通用 DNS 策略，避免国内直连域名未命中域名集合时仍绕经境外解析。
 
-顶层 `ipv6: true` 允许内核连接应用已获得的 IPv6 地址，避免手机 VPN 接收 IPv6 流量后，内核以 `ip version error` 拒绝国内直连。`dns.ipv6: false` 继续抑制该 DNS 服务的 AAAA 查询结果；它与允许已有 IPv6 地址出站是不同设置。`unified-delay: true` 统一订阅内核的测速方式，不能保证不同设备的实际延迟相同。
+顶层 `ipv6: false` 与 `dns.ipv6: false` 统一使用 IPv4。手机还需在“工具 → 进阶配置 → 网络”中关闭 VPN 的 IPv6 接入，并重连 VPN；否则应用已获得的 IPv6 地址仍进入隧道，内核会以 `ip version error` 拒绝连接。`unified-delay: true` 统一订阅内核的测速方式，不能保证不同设备的实际延迟相同。
 
 在 EdgeTunnel 后台的订阅转换设置中，将 SUBCONFIG 设置为：
 

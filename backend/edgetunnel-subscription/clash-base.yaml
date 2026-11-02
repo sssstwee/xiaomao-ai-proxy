@@ -1,4 +1,4 @@
-ipv6: true
+ipv6: false
 unified-delay: true
 
 dns:
