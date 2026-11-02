@@ -1,0 +1,62 @@
+dns:
+  enable: true
+  ipv6: false
+  enhanced-mode: fake-ip
+  fake-ip-range: 198.18.0.1/16
+  fake-ip-filter:
+    - '*.lan'
+    - '*.local'
+    - '+.home.arpa'
+    - localhost
+  use-hosts: true
+  use-system-hosts: true
+  prefer-h3: false
+  respect-rules: true
+  default-nameserver:
+    - 223.5.5.5
+    - 119.29.29.29
+  proxy-server-nameserver: &direct-dns
+    - https://dns.alidns.com/dns-query#DIRECT
+    - https://doh.pub/dns-query#DIRECT
+  nameserver: &overseas-dns
+    - https://1.1.1.1/dns-query#☁️ CloudFlareCDN
+    - https://8.8.8.8/dns-query#☁️ CloudFlareCDN
+  nameserver-policy:
+    '+.cloudflare-ech.com': *direct-dns
+    '+.anthropic.com': *overseas-dns
+    '+.claude.ai': *overseas-dns
+    '+.claude.com': *overseas-dns
+    '+.clau.de': *overseas-dns
+    '+.claudemcpclient.com': *overseas-dns
+    '+.claudemcpcontent.com': *overseas-dns
+    '+.claudeusercontent.com': *overseas-dns
+    '+.chatgpt.com': *overseas-dns
+    '+.openai.com': *overseas-dns
+    '+.oaistatic.com': *overseas-dns
+    '+.oaiusercontent.com': *overseas-dns
+    servd-anthropic-website.b-cdn.net: *overseas-dns
+    anthropic.auth0.com: *overseas-dns
+    '+.muse.ai': *overseas-dns
+    '+.meta.ai': *overseas-dns
+    '+.metaaivm.com': *overseas-dns
+    '+.atmeta.com': *overseas-dns
+    rule-set:dns-private: *direct-dns
+    rule-set:dns-cn: *direct-dns
+
+rule-providers:
+  dns-private:
+    type: http
+    behavior: domain
+    format: mrs
+    url: https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/private.mrs
+    path: ./providers/dns-private.mrs
+    interval: 86400
+    proxy: ☁️ CloudFlareCDN
+  dns-cn:
+    type: http
+    behavior: domain
+    format: mrs
+    url: https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/cn.mrs
+    path: ./providers/dns-cn.mrs
+    interval: 86400
+    proxy: ☁️ CloudFlareCDN
