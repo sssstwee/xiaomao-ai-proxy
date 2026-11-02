@@ -6,6 +6,10 @@ DNS 使用 [MetaCubeX/meta-rules-dat](https://github.com/MetaCubeX/meta-rules-da
 
 节点域名使用独立的 `proxy-server-nameserver`，避免解析依赖代理、代理又依赖解析的循环。`default-nameserver` 只负责解析 DNS 服务本身的域名。EdgeTunnel 仍可按后台 ECH 设置加入 Worker 与 ECH 查询域名的策略。
 
+`direct-nameserver` 为实际选择直连的连接单独使用国内 DoH，且不跟随通用 DNS 策略，避免国内直连域名未命中域名集合时仍绕经境外解析。
+
+顶层 `ipv6: false` 与 `dns.ipv6: false` 统一使用 IPv4。手机还需在“工具 → 进阶配置 → 网络”中关闭 VPN 的 IPv6 接入，并重连 VPN；否则应用已获得的 IPv6 地址仍进入隧道，内核会以 `ip version error` 拒绝连接。`unified-delay: true` 统一订阅内核的测速方式，不能保证不同设备的实际延迟相同。
+
 在 EdgeTunnel 后台的订阅转换设置中，将 SUBCONFIG 设置为：
 
 ```text
