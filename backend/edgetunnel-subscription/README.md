@@ -8,6 +8,8 @@ DNS 使用 [MetaCubeX/meta-rules-dat](https://github.com/MetaCubeX/meta-rules-da
 
 `direct-nameserver` 为实际选择直连的连接单独使用国内 DoH，且不跟随通用 DNS 策略，避免国内直连域名未命中域名集合时仍绕经境外解析。
 
+这份 EdgeTunnel 订阅的节点未启用 UDP，规则首项拒绝 UDP 443，让 QUIC 回退到 TCP，避免 Mihomo 跳过不支持 UDP 的代理后落到直连。Cloudflare DoH 使用 `cloudflare-dns.com` 域名，保留 TLS SNI；IP 形式的 `1.1.1.1` 在当前 Worker 反代路径上会收到与目标 IP 不匹配的证书。
+
 顶层 `ipv6: false` 与 `dns.ipv6: false` 统一使用 IPv4。手机还需在“工具 → 进阶配置 → 网络”中关闭 VPN 的 IPv6 接入，并重连 VPN；否则应用已获得的 IPv6 地址仍进入隧道，内核会以 `ip version error` 拒绝连接。`unified-delay: true` 统一订阅内核的测速方式，不能保证不同设备的实际延迟相同。
 
 在 EdgeTunnel 后台的订阅转换设置中，将 SUBCONFIG 设置为：
