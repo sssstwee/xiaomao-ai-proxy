@@ -1,0 +1,23 @@
+[Unit]
+Description=EdgeTunnel subscription converter
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=edgetunnel-converter
+Group=edgetunnel-converter
+WorkingDirectory=/opt/edgetunnel-subconverter
+ExecStart=/opt/edgetunnel-subconverter/subconverter -f /opt/edgetunnel-subconverter/pref.ini
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/opt/edgetunnel-subconverter/cache
+MemoryMax=96M
+TasksMax=64
+
+[Install]
+WantedBy=multi-user.target
