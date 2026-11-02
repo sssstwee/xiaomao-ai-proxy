@@ -6,6 +6,8 @@
 
 转换服务只监听 `127.0.0.1:25510`。在现有 Caddy HTTPS 站点内，用随机私密路径仅转发 GET `/私密前缀/sub` 到本机 `/sub`，保留查询参数，并对该路径设置 `log_skip`。私密前缀不入库、不写访问日志；其他路径继续由原订阅服务处理。修改前备份 Caddyfile，执行 `caddy validate` 后重载。
 
+SUBAPI 使用指向该 VPS 的仅 DNS 源站域名，并由 Caddy 自动维护匹配域名的公开可信证书。不能把 IP 地址直接写入 SUBAPI：[Workers fetch 不支持直接请求 IP 地址](https://developers.cloudflare.com/workers/platform/known-issues/)。
+
 验证十节点、规则、DNS、TLS/ECH 与已安装 Mihomo 的解析检查后，仅将 EdgeTunnel KV `config.json` 的 `订阅转换配置.SUBAPI` 改为该 HTTPS 私密前缀。`SUBCONFIG`、节点列表与客户端订阅地址保持原值。失败时将 SUBAPI 恢复为切换前的值，无需修改客户端或重启代理节点。
 
 外部模板缓存 300 秒、规则缓存 21600 秒。发布托管模板后，如需立即生效，清理此服务自身缓存并重启转换服务；验证新的完整订阅后再刷新客户端。
