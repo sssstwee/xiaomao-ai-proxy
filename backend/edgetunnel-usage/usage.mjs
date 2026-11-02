@@ -116,6 +116,8 @@ export function installUsagePanel() {
       : usage.planError || '用量读取失败，请稍后重试');
     const info = module.querySelector('.cf-info-text');
     if (info) {
+      info.style.whiteSpace = 'normal';
+      info.style.minWidth = '0';
       const date = (value) => new Date(value).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false });
       const period = known ? `${paid ? '账期' : '统计日'}：${date(usage.periodStart)} 至 ${date(usage.periodEnd)}（北京时间）。` : '';
       const billing = paid ? '每账期包含 1,000 万次请求，超出按量计费，没有每日 10 万次上限。' : '';
@@ -123,6 +125,7 @@ export function installUsagePanel() {
     }
   }
   window.updateCFUsageDisplay = render;
+  render({ plan: 'unknown', planName: '正在读取当前套餐', planError: '正在读取套餐与用量…' });
   let pending = false;
   async function refresh() {
     if (document.hidden || pending) return;
