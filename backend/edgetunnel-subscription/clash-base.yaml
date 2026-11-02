@@ -1,3 +1,6 @@
+ipv6: true
+unified-delay: true
+
 dns:
   enable: true
   ipv6: false
@@ -18,6 +21,8 @@ dns:
   proxy-server-nameserver: &direct-dns
     - https://dns.alidns.com/dns-query#DIRECT
     - https://doh.pub/dns-query#DIRECT
+  direct-nameserver: *direct-dns
+  direct-nameserver-follow-policy: false
   nameserver: &overseas-dns
     - https://1.1.1.1/dns-query#☁️ CloudFlareCDN
     - https://8.8.8.8/dns-query#☁️ CloudFlareCDN
