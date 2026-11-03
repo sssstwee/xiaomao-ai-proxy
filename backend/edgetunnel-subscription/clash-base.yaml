@@ -1,6 +1,6 @@
 proxy-groups:
   - name: 默认代理
-    icon: https://raw.githubusercontent.com/zuluion/Qure/0d484e5fb24f1c1bb52372bfb057d3a001aaa648/IconSet/Color/Proxy.png
+    icon: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/icons/Proxy.png
     type: url-test
     url: https://www.gstatic.com/generate_204
     interval: 60
@@ -11,7 +11,7 @@ proxy-groups:
     max-failed-times: 2
     include-all-proxies: true
   - name: Claude 专用
-    icon: https://raw.githubusercontent.com/zuluion/Qure/0d484e5fb24f1c1bb52372bfb057d3a001aaa648/IconSet/Color/Claude.png
+    icon: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/icons/Claude.png
     type: fallback
     url: https://api.anthropic.com/v1/models
     interval: 90
@@ -21,7 +21,7 @@ proxy-groups:
     include-all-proxies: true
     exclude-filter: (?i)warp|^cf-tcp-backup$
   - name: ChatGPT 专用
-    icon: https://raw.githubusercontent.com/zuluion/Qure/0d484e5fb24f1c1bb52372bfb057d3a001aaa648/IconSet/Color/ChatGPT.png
+    icon: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/icons/ChatGPT.png
     type: fallback
     url: https://api.openai.com/v1/models
     interval: 90
@@ -73,7 +73,7 @@ rule-providers:
     type: http
     behavior: domain
     format: yaml
-    url: https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/reject.txt
+    url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/reject.yaml
     path: ./ruleset/edgetunnel-reject.yaml
     interval: 86400
     proxy: 默认代理
@@ -81,7 +81,7 @@ rule-providers:
     type: http
     behavior: domain
     format: yaml
-    url: https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/icloud.txt
+    url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/icloud.yaml
     path: ./ruleset/edgetunnel-icloud.yaml
     interval: 86400
     proxy: 默认代理
@@ -89,7 +89,7 @@ rule-providers:
     type: http
     behavior: domain
     format: yaml
-    url: https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/apple.txt
+    url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/apple.yaml
     path: ./ruleset/edgetunnel-apple.yaml
     interval: 86400
     proxy: 默认代理
@@ -97,7 +97,7 @@ rule-providers:
     type: http
     behavior: domain
     format: yaml
-    url: https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/google.txt
+    url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/google.yaml
     path: ./ruleset/edgetunnel-google.yaml
     interval: 86400
     proxy: 默认代理
@@ -105,7 +105,7 @@ rule-providers:
     type: http
     behavior: domain
     format: yaml
-    url: https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/proxy.txt
+    url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/proxy.yaml
     path: ./ruleset/edgetunnel-proxy.yaml
     interval: 86400
     proxy: 默认代理
@@ -113,7 +113,7 @@ rule-providers:
     type: http
     behavior: domain
     format: yaml
-    url: https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/direct.txt
+    url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/direct.yaml
     path: ./ruleset/edgetunnel-direct.yaml
     interval: 86400
     proxy: 默认代理
@@ -121,7 +121,7 @@ rule-providers:
     type: http
     behavior: domain
     format: yaml
-    url: https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/private.txt
+    url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/private.yaml
     path: ./ruleset/edgetunnel-private.yaml
     interval: 86400
     proxy: 默认代理
@@ -129,7 +129,7 @@ rule-providers:
     type: http
     behavior: domain
     format: yaml
-    url: https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/gfw.txt
+    url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/gfw.yaml
     path: ./ruleset/edgetunnel-gfw.yaml
     interval: 86400
     proxy: 默认代理
@@ -137,7 +137,7 @@ rule-providers:
     type: http
     behavior: domain
     format: yaml
-    url: https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/tld-not-cn.txt
+    url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/tld-not-cn.yaml
     path: ./ruleset/edgetunnel-tld-not-cn.yaml
     interval: 86400
     proxy: 默认代理
@@ -145,7 +145,7 @@ rule-providers:
     type: http
     behavior: ipcidr
     format: yaml
-    url: https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/telegramcidr.txt
+    url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/telegramcidr.yaml
     path: ./ruleset/edgetunnel-telegramcidr.yaml
     interval: 86400
     proxy: 默认代理
@@ -153,7 +153,7 @@ rule-providers:
     type: http
     behavior: ipcidr
     format: yaml
-    url: https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/cncidr.txt
+    url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/cncidr.yaml
     path: ./ruleset/edgetunnel-cncidr.yaml
     interval: 86400
     proxy: 默认代理
@@ -161,7 +161,7 @@ rule-providers:
     type: http
     behavior: ipcidr
     format: yaml
-    url: https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/lancidr.txt
+    url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/lancidr.yaml
     path: ./ruleset/edgetunnel-lancidr.yaml
     interval: 86400
     proxy: 默认代理
@@ -169,7 +169,7 @@ rule-providers:
     type: http
     behavior: classical
     format: yaml
-    url: https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/applications.txt
+    url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/applications.yaml
     path: ./ruleset/edgetunnel-applications.yaml
     interval: 86400
     proxy: 默认代理
@@ -177,7 +177,7 @@ rule-providers:
     type: http
     behavior: domain
     format: yaml
-    url: https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/line.yaml
+    url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/line.yaml
     path: ./ruleset/edgetunnel-line.yaml
     interval: 86400
     proxy: 默认代理
@@ -185,7 +185,7 @@ rule-providers:
     type: http
     behavior: domain
     format: yaml
-    url: https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/category-ai-!cn.yaml
+    url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/ai.yaml
     path: ./ruleset/edgetunnel-ai.yaml
     interval: 86400
     proxy: 默认代理
@@ -193,7 +193,7 @@ rule-providers:
     type: http
     behavior: domain
     format: yaml
-    url: https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/category-ai-cn.yaml
+    url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/ai-cn.yaml
     path: ./ruleset/edgetunnel-ai-cn.yaml
     interval: 86400
     proxy: 默认代理
@@ -201,7 +201,7 @@ rule-providers:
     type: http
     behavior: domain
     format: yaml
-    url: https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/anthropic.yaml
+    url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/anthropic.yaml
     path: ./ruleset/edgetunnel-anthropic.yaml
     interval: 86400
     proxy: 默认代理
@@ -209,7 +209,7 @@ rule-providers:
     type: http
     behavior: domain
     format: yaml
-    url: https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/openai.yaml
+    url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/openai.yaml
     path: ./ruleset/edgetunnel-openai.yaml
     interval: 86400
     proxy: 默认代理
@@ -217,7 +217,7 @@ rule-providers:
     type: http
     behavior: classical
     format: yaml
-    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Line/Line.yaml
+    url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/line-ip.yaml
     path: ./ruleset/edgetunnel-line-ip.yaml
     interval: 86400
     proxy: 默认代理
@@ -789,3 +789,12 @@ dns:
   use-hosts: true
   use-system-hosts: true
 unified-delay: true
+
+geodata-mode: false
+geo-auto-update: true
+geo-update-interval: 24
+geox-url:
+  geoip: https://github.com/sssstwee/edgetunnel/releases/latest/download/geoip.dat
+  geosite: https://github.com/sssstwee/edgetunnel/releases/latest/download/geosite.dat
+  mmdb: https://github.com/sssstwee/edgetunnel/releases/latest/download/geoip.metadb
+  asn: https://github.com/sssstwee/edgetunnel/releases/latest/download/GeoLite2-ASN.mmdb

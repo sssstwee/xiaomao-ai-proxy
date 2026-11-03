@@ -65,6 +65,23 @@ class PolicyTest(unittest.TestCase):
         self.assertIn(b'proxies:\n  - ', content)
         self.assertEqual(yaml.safe_load(content), config)
 
+    def test_static_dependencies_use_own_repositories_and_survive_rendering(self):
+        raw = 'https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/'
+        providers = self.template['rule-providers'].values()
+        remote = [provider for provider in providers if provider['type'] == 'http']
+        self.assertEqual(len(remote), 19)
+        for provider in remote:
+            self.assertTrue(provider['url'].startswith(raw + 'rules/'))
+        for group in self.template['proxy-groups']:
+            self.assertTrue(group['icon'].startswith(raw + 'icons/'))
+        self.assertEqual(SYNC.VOICE_SOURCE, raw + 'data/chatgpt-voice.json')
+        config = SYNC.render(self.current, self.template)
+        self.assertEqual(set(config['geox-url']), {'geoip', 'geosite', 'mmdb', 'asn'})
+        for url in config['geox-url'].values():
+            self.assertTrue(url.startswith('https://github.com/sssstwee/edgetunnel/releases/latest/download/'))
+        for key in ['geox-url', 'geodata-mode', 'geo-auto-update', 'geo-update-interval']:
+            self.assertEqual(config[key], self.template[key])
+
 
 if __name__ == '__main__':
     unittest.main()
