@@ -36,6 +36,8 @@ class PolicyTest(unittest.TestCase):
             pattern = __import__('re').compile(group['exclude-filter'])
             members = [node['name'] for node in config['proxies'] if not pattern.search(node['name'])]
             self.assertEqual(members, ['voyra-hy2-direct', 'voyra-direct'])
+            self.assertEqual(group['proxies'], members)
+            self.assertNotIn('include-all-proxies', group)
             self.assertEqual(group['type'], 'fallback')
         self.current['proxies'] = [node for node in self.nodes if 'direct' not in node['name']]
         with self.assertRaises(ValueError):

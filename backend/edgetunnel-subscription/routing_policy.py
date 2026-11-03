@@ -48,6 +48,8 @@ def render(current, template):
         members = [name for name in order if not any(pattern.search(name) for pattern in filters)]
         if not members:
             raise ValueError('A hosted proxy group has no usable members')
+        group['proxies'] = members
+        group.pop('include-all-proxies', None)
     result['harmony-runtime'] = current.get('harmony-runtime', {})
     return result
 

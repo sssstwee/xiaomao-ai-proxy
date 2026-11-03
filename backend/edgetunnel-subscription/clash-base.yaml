@@ -17,7 +17,7 @@ proxy-groups:
     interval: 90
     lazy: false
     timeout: 3000
-    expected-status: "405"
+    expected-status: "401/405"
     include-all-proxies: true
     exclude-filter: (?i)warp|^cf-tcp-backup$
   - name: ChatGPT 专用
