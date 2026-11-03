@@ -1,3 +1,5 @@
+> 此目录保留历史 VPS 转换服务和回退步骤。当前 CF 主订阅使用 `sssstwee/edgetunnel` 的 Worker 内置转换，SUBAPI 指向自身 Worker 域名，不依赖此服务；Voyra 独立入口继续保留。
+
 # 私有订阅转换后端
 
 复用 [asdlokj1qpi233/subconverter v0.9.9](https://github.com/asdlokj1qpi233/subconverter/releases/tag/v0.9.9) 的 Linux amd64 发布包，SHA-256 为 `b9d6f969300d3c8398f9d970db7436274df0ff3e7c91d935d26bbd79fafc8488`。部署在现有 VPS，无新增订阅费用；客户端仍订阅 EdgeTunnel，代理数据仍通过 Worker 转发。

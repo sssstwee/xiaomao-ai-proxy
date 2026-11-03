@@ -1,6 +1,6 @@
 # EdgeTunnel 与 Voyra 的统一托管分流
 
-`acl4ssr.ini` 通过 subconverter 原生 `clash_rule_base` 加载 `clash-base.yaml`。**分组、图标、服务探活、规则集、AI 分流、DNS 和 UDP 防直连规则统一维护在 `clash-base.yaml`。** INI 关闭规则生成与覆盖，VPS 转换出口按模板合并最终配置；模板中的 `include-all-proxies` 由转换层解析为本次订阅的显式成员列表，保留原节点顺序，并完整保留图标及 Mihomo 专有字段。
+`acl4ssr.ini` 通过 subconverter 原生 `clash_rule_base` 加载 `clash-base.yaml`。**分组、图标、服务探活、规则集、AI 分流、DNS 和 UDP 防直连规则统一维护在 `clash-base.yaml`。** INI 关闭规则生成与覆盖，EdgeTunnel 的内置转换按模板合并最终配置；模板中的 `include-all-proxies` 由转换层解析为本次订阅的显式成员列表，保留原节点顺序，并完整保留图标及 Mihomo 专有字段。
 
 三个组分别为 `默认代理`（url-test，60 秒，50ms 容差）、`Claude 专用` 和 `ChatGPT 专用`（fallback，90 秒）。图标采用固定版本的 Qure，文件镜像在自有资源仓库。两个 AI 组排除 WARP 和 `cf-tcp-backup`：Voyra 保持 VPS 原生出口，EdgeTunnel 继续使用自己的节点，两者不复制节点凭据。
 
@@ -14,7 +14,9 @@ EdgeTunnel 后台继续使用原 SUBAPI 和以下 SUBCONFIG，无需更换地址
 https://raw.githubusercontent.com/sssstwee/xiaomao-ai-proxy/main/backend/edgetunnel-subscription/acl4ssr.ini
 ```
 
-旧版 subconverter 会覆盖模板中的分组，因此 `converter/policy_server.py` 在本机 25511 端口复用原 25510 转换服务，并从同一 YAML 补齐最终配置；Caddy 的原私密转换路由转发到 25511。Worker 不再负责注入分组和规则。转换层每 300 秒检查托管模板，网络失败时使用私有缓存，避免失去最后可用配置。定制 Worker 只保留传输兼容、节点域名解析和语音网段刷新，不覆盖模板策略。保持“仅输出节点信息”关闭。
+EdgeTunnel 的 `converter.mjs` 通过私有 Service Binding 调用独立 Cloudflare 转换 Worker，复用 `@subconverter/core` 转换节点，并按本模板补齐完整策略；后台 SUBAPI 填写 Worker 自身 HTTPS 域名，SUBCONFIG 保持上述 INI 地址。模板每 300 秒检查更新，最后可用版本保存到转换服务的专用 Cloudflare KV。节点列表在主 Worker 的同一请求内生成，经私有绑定传给转换 Worker，无需回调自身公网 HTTP，也不再调用 VPS。分组、规则和 DNS 全部来自模板；传输兼容、节点域名解析和语音网段刷新继续保留。保持“仅输出节点信息”关闭。
+
+`converter/policy_server.py` 与原 VPS subconverter 保留为历史回退方案，CF 主订阅不再使用它们。Voyra 仍独立运行原订阅和节点服务，按用户选择保留至停用 VPS 时再切换。
 
 Voyra 运行 `routing_policy.py`，从同一托管 YAML 更新配置，保留节点参数及原首选顺序、端口和 TUN 等运行设置。安装 `voyra-routing-sync.service` / `.timer` 后每 15 分钟检查一次；写入前使用 Mihomo 验证，原子替换文件，自动保留私有备份。下载或验证失败时保留原订阅，不重启代理节点服务。原订阅 URL 和鉴权保持原值。
 
@@ -23,9 +25,9 @@ python3 routing_policy.py --config /opt/voyra-subscription/vpn.yml --mihomo /usr
 python3 -m unittest discover -s backend/edgetunnel-subscription -p 'test_*.py' -v
 ```
 
-修改托管 YAML 后，EdgeTunnel 等待转换模板缓存（300 秒）失效或清理转换服务缓存，Voyra 等待定时同步或手动启动同步服务，再更新客户端订阅。不要在 Worker 中另写一份分组/业务规则。Clash Verge 覆写脚本和客户端 DNS 设置也不应覆盖托管策略。
+修改托管 YAML 后，EdgeTunnel 等待 Worker 模板缓存（300 秒）失效，Voyra 等待定时同步或手动启动同步服务，再更新客户端订阅。不要在 Worker 中另写一份分组/业务规则。Clash Verge 覆写脚本和客户端 DNS 设置也不应覆盖托管策略。
 
-转换后端的部署与回退方式见 [converter/README.md](converter/README.md)。线上节点凭据、转换后端私密地址和备份不入库。
+历史 VPS 转换后端的部署与回退方式见 [converter/README.md](converter/README.md)。线上节点凭据、转换后端私密地址和备份不入库。
 
 ## 公共资源归档
 
