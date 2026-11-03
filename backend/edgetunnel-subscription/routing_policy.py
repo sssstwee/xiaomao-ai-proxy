@@ -48,6 +48,8 @@ def render(current, template):
     order = list(dict.fromkeys([name for name in old_group.get('proxies', []) if name in nodes] + list(nodes)))
     result['proxies'] = [nodes[name] for name in order]
     for group in result['proxy-groups']:
+        if not group.get('include-all-proxies'):
+            continue
         filters = [re.compile(pattern) for pattern in group.get('exclude-filter', '').split('`') if pattern]
         members = [name for name in order if not any(pattern.search(name) for pattern in filters)]
         if not members:

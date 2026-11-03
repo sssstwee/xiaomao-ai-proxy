@@ -1,6 +1,23 @@
 proxy-groups:
   - name: 默认代理
     icon: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/icons/Proxy.png
+    type: select
+    proxies:
+      - 负载均衡
+      - 自动选择
+  - name: 负载均衡
+    icon: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/icons/Round_Robin.png
+    type: load-balance
+    strategy: round-robin
+    url: https://www.gstatic.com/generate_204
+    interval: 60
+    lazy: false
+    timeout: 4000
+    expected-status: "204"
+    max-failed-times: 2
+    include-all-proxies: true
+  - name: 自动选择
+    icon: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/icons/Auto.png
     type: url-test
     url: https://www.gstatic.com/generate_204
     interval: 60
