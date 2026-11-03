@@ -15,6 +15,7 @@ from pathlib import Path
 import yaml
 
 TEMPLATE = 'https://raw.githubusercontent.com/sssstwee/xiaomao-ai-proxy/main/backend/edgetunnel-subscription/clash-base.yaml'
+VOICE_SOURCE = 'https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/data/chatgpt-voice.json'
 
 
 class IndentedDumper(yaml.SafeDumper):
@@ -38,6 +39,9 @@ def render(current, template):
     result = copy.deepcopy(current)
     for key in ['mode', 'ipv6', 'unified-delay', 'proxy-groups', 'rule-providers', 'rules', 'dns']:
         result[key] = copy.deepcopy(template[key])
+    for key in ['geox-url', 'geodata-mode', 'geo-auto-update', 'geo-update-interval']:
+        if key in template:
+            result[key] = copy.deepcopy(template[key])
     nodes = {node['name']: node for node in current['proxies']}
     old_default = next((rule.split(',')[1] for rule in reversed(current.get('rules', [])) if rule.startswith(('MATCH,', 'FINAL,'))), '')
     old_group = next((group for group in (current.get('proxy-groups') or []) if group['name'] == old_default), {})
@@ -69,7 +73,7 @@ def main():
     voice = template.get('rule-providers', {}).get('openai-voice')
     if voice:
         try:
-            document = json.loads(download('https://openai.com/chatgpt-voice.json'))
+            document = json.loads(download(VOICE_SOURCE))
             prefixes = [entry[key] for entry in document['prefixes'] for key in ['ipv4Prefix', 'ipv6Prefix'] if key in entry]
             if not prefixes or len(prefixes) > 10000:
                 raise ValueError('Invalid voice prefix count')
