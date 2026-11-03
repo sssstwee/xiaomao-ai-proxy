@@ -1,0 +1,68 @@
+import importlib.util
+import unittest
+from pathlib import Path
+
+import yaml
+
+ROOT = Path(__file__).parent
+SPEC = importlib.util.spec_from_file_location('routing_policy', ROOT / 'routing_policy.py')
+SYNC = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(SYNC)
+
+
+class PolicyTest(unittest.TestCase):
+    def setUp(self):
+        self.template = yaml.safe_load((ROOT / 'clash-base.yaml').read_text())
+        self.nodes = [
+            {'name': 'voyra-direct', 'type': 'vless', 'uuid': 'private-fixture', 'udp': True},
+            {'name': 'voyra-warp', 'type': 'vless', 'udp': True},
+            {'name': 'voyra-hy2-direct', 'type': 'hysteria2', 'password': 'private-fixture'},
+            {'name': 'cf-tcp-backup', 'type': 'vless', 'udp': False},
+        ]
+        self.current = {'proxies': self.nodes, 'proxy-groups': [{'name': 'old', 'proxies': ['voyra-hy2-direct', 'voyra-direct', 'voyra-warp', 'cf-tcp-backup']}], 'rules': ['MATCH,old'], 'mixed-port': 7890, 'tun': {'enable': True}}
+
+    def test_shared_policy_preserves_credentials_and_runtime_settings(self):
+        config = SYNC.render(self.current, self.template)
+        self.assertEqual({node['name']: node for node in config['proxies']}, {node['name']: node for node in self.nodes})
+        self.assertEqual(config['proxies'][0]['name'], 'voyra-hy2-direct')
+        self.assertEqual(config['mixed-port'], 7890)
+        self.assertEqual(config['tun'], {'enable': True})
+        self.assertEqual(config['rules'], self.template['rules'])
+        self.assertEqual(SYNC.render(config, self.template), config)
+
+    def test_ai_excludes_warp_and_cloudflare_backup_without_direct_escape(self):
+        config = SYNC.render(self.current, self.template)
+        for group in config['proxy-groups'][1:]:
+            pattern = __import__('re').compile(group['exclude-filter'])
+            members = [node['name'] for node in config['proxies'] if not pattern.search(node['name'])]
+            self.assertEqual(members, ['voyra-hy2-direct', 'voyra-direct'])
+            self.assertEqual(group['type'], 'fallback')
+        self.current['proxies'] = [node for node in self.nodes if 'direct' not in node['name']]
+        with self.assertRaises(ValueError):
+            SYNC.render(self.current, self.template)
+
+    def test_ai_bootstrap_precedes_direct_and_ad_rules(self):
+        rules = self.template['rules']
+        claude = 'RULE-SET,anthropic-bootstrap,Claude 专用,no-resolve'
+        chatgpt = 'RULE-SET,openai-bootstrap,ChatGPT 专用,no-resolve'
+        self.assertLess(rules.index(claude), rules.index(chatgpt))
+        self.assertLess(rules.index(chatgpt), rules.index('RULE-SET,reject,REJECT'))
+        self.assertLess(rules.index(chatgpt), rules.index('RULE-SET,applications,DIRECT'))
+        self.assertEqual(rules[0], 'AND,((NETWORK,UDP),(DST-PORT,443)),REJECT')
+        providers = self.template['rule-providers']
+        self.assertIn('anthropic.auth0.com', providers['anthropic-bootstrap']['payload'])
+        self.assertIn('+.oaistatsig.com', providers['openai-bootstrap']['payload'])
+        self.assertIn('+.featuregates.org', providers['openai-bootstrap']['payload'])
+        self.assertGreater(len(providers['openai-voice']['payload']), 100)
+        for group, key in [('Claude 专用', 'rule-set:anthropic-bootstrap,anthropic'), ('ChatGPT 专用', 'rule-set:openai-bootstrap,openai')]:
+            self.assertTrue(all(server.endswith('#' + group) for server in self.template['dns']['nameserver-policy'][key]))
+
+    def test_node_list_indent_remains_compatible_with_edgetunnel_transport_patch(self):
+        config = SYNC.render(self.current, self.template)
+        content = SYNC.serialize(config)
+        self.assertIn(b'proxies:\n  - ', content)
+        self.assertEqual(yaml.safe_load(content), config)
+
+
+if __name__ == '__main__':
+    unittest.main()
