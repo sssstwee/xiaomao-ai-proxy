@@ -2,7 +2,7 @@
 
 `acl4ssr.ini` 通过 subconverter 原生 `clash_rule_base` 加载 `clash-base.yaml`。**分组、图标、服务探活、规则集、AI 分流、DNS 和 UDP 防直连规则统一维护在 `clash-base.yaml`。** INI 关闭规则生成与覆盖，EdgeTunnel 的内置转换按模板合并最终配置；模板中的 `include-all-proxies` 由转换层解析为本次订阅的显式成员列表，保留原节点顺序，并完整保留图标及 Mihomo 专有字段。
 
-三个组分别为 `默认代理`（url-test，60 秒，50ms 容差）、`Claude 专用` 和 `ChatGPT 专用`（fallback，90 秒）。图标采用固定版本的 Qure，文件镜像在自有资源仓库。两个 AI 组排除 WARP 和 `cf-tcp-backup`：Voyra 保持 VPS 原生出口，EdgeTunnel 继续使用自己的节点，两者不复制节点凭据。
+五个组分别为 `默认代理`（select，默认选择负载均衡）、`负载均衡`（load-balance，round-robin）、`自动选择`（url-test，60 秒，50ms 容差）、`Claude 专用` 和 `ChatGPT 专用`（fallback，90 秒）。负载均衡按新连接轮询可用节点，同一长连接中的请求保持同一节点，单连接带宽不会叠加。图标采用固定版本的 Qure：默认代理为蓝色箭头，负载均衡为绿色环形节点，自动选择为黄色闪电，文件镜像在自有资源仓库。两个 AI 组排除 WARP 和 `cf-tcp-backup`：Voyra 保持 VPS 原生出口，EdgeTunnel 继续使用自己的节点，两者不复制节点凭据。
 
 Claude / OpenAI 分别使用 MetaCubeX 的每日更新域名规则，并内联已审查的主站、认证、CDN、功能开关和资源域名作为首次启动保障。Claude 专属 Auth0 先于 OpenAI 共用认证；同时保留 Anthropic 官方入站 IP、OpenAI 语音网段和 Artifacts 资源。Voice 网段来自 [OpenAI 官方 JSON](https://openai.com/chatgpt-voice.json)，同步脚本及定制 Worker 刷新时读取自有仓库的 JSON 镜像，失败保留模板快照。
 
@@ -31,6 +31,6 @@ python3 -m unittest discover -s backend/edgetunnel-subscription -p 'test_*.py' -
 
 ## 公共资源归档
 
-19 个远程规则集、3 个图标和 Voice JSON 全部引用 [sssstwee/edgetunnel/resources](https://github.com/sssstwee/edgetunnel/tree/main/resources)。GeoIP / GeoSite / MetaDB / ASN 四个大数据文件引用该仓库 Releases，并在 `geox-url` 中显式指定；保持 MMDB 模式，每 24 小时更新，避免内核回到默认第三方下载地址。转换层和 Voyra 同步均保留这些字段。5 个 inline 规则集继续保存在本模板。
+19 个远程规则集、5 个图标和 Voice JSON 全部引用 [sssstwee/edgetunnel/resources](https://github.com/sssstwee/edgetunnel/tree/main/resources)。GeoIP / GeoSite / MetaDB / ASN 四个大数据文件引用该仓库 Releases，并在 `geox-url` 中显式指定；保持 MMDB 模式，每 24 小时更新，避免内核回到默认第三方下载地址。转换层和 Voyra 同步均保留这些字段。5 个 inline 规则集继续保存在本模板。
 
 资源仓库每天同步已使用的成熟上游数据，保留来源提交、SHA256、许可证及最后可用快照；更新失败不会清空现有资源。规则和图标使用固定的自有 main 地址，Geo 数据使用自有 `releases/latest/download` 地址。业务规则在此处维护，资源来源在资源仓库的 `sources.json` 维护；不要将鉴权和节点凭据复制到公共文件。

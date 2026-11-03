@@ -32,7 +32,9 @@ class PolicyTest(unittest.TestCase):
 
     def test_ai_excludes_warp_and_cloudflare_backup_without_direct_escape(self):
         config = SYNC.render(self.current, self.template)
-        for group in config['proxy-groups'][1:]:
+        for group in config['proxy-groups']:
+            if group['name'] not in ['Claude 专用', 'ChatGPT 专用']:
+                continue
             pattern = __import__('re').compile(group['exclude-filter'])
             members = [node['name'] for node in config['proxies'] if not pattern.search(node['name'])]
             self.assertEqual(members, ['voyra-hy2-direct', 'voyra-direct'])
@@ -42,6 +44,17 @@ class PolicyTest(unittest.TestCase):
         self.current['proxies'] = [node for node in self.nodes if 'direct' not in node['name']]
         with self.assertRaises(ValueError):
             SYNC.render(self.current, self.template)
+
+    def test_selector_preserves_group_references_and_load_balance_expands_nodes(self):
+        config = SYNC.render(self.current, self.template)
+        groups = {group['name']: group for group in config['proxy-groups']}
+        self.assertEqual(groups['默认代理']['type'], 'select')
+        self.assertEqual(groups['默认代理']['proxies'], ['负载均衡', '自动选择'])
+        self.assertEqual(groups['负载均衡']['type'], 'load-balance')
+        self.assertEqual(groups['负载均衡']['strategy'], 'round-robin')
+        self.assertEqual(groups['负载均衡']['proxies'], [node['name'] for node in config['proxies']])
+        self.assertEqual(groups['自动选择']['type'], 'url-test')
+        self.assertEqual(groups['自动选择']['proxies'], groups['负载均衡']['proxies'])
 
     def test_ai_bootstrap_precedes_direct_and_ad_rules(self):
         rules = self.template['rules']
