@@ -1,0 +1,22 @@
+[Unit]
+Description=Apply hosted policy to EdgeTunnel conversions
+After=network-online.target edgetunnel-subconverter.service
+Requires=edgetunnel-subconverter.service
+
+[Service]
+Type=simple
+User=edgetunnel-converter
+Group=edgetunnel-converter
+WorkingDirectory=/opt/edgetunnel-policy
+ExecStart=/usr/bin/python3 /opt/edgetunnel-policy/policy_server.py
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/cache/edgetunnel-policy
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

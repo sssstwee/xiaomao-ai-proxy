@@ -1,0 +1,10 @@
+[Unit]
+Description=Apply the shared hosted routing policy to Voyra
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /opt/edgetunnel-policy/routing_policy.py --mihomo /usr/local/bin/mihomo --mihomo-home /var/lib/voyra-routing
+TimeoutStartSec=60
+UMask=0077
