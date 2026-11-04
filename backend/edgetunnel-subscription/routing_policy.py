@@ -20,6 +20,7 @@ QUIC_MATCH = 'AND,((NETWORK,UDP),(DST-PORT,443))'
 QUIC_REJECT = f'{QUIC_MATCH},REJECT'
 QUIC_GROUP = 'Voyra QUIC'
 QUIC_RULES = 'voyra-quic'
+QUIC_ICON = 'https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/icons/QUIC.png'
 
 
 class IndentedDumper(yaml.SafeDumper):
@@ -71,7 +72,7 @@ def render(current, template, quic_nodes=()):
         if result['rules'][0] != QUIC_REJECT:
             raise ValueError('Missing initial QUIC rejection rule')
         balance = next(group for group in result['proxy-groups'] if group['name'] == '负载均衡')
-        result['proxy-groups'].append({**balance, 'name': QUIC_GROUP, 'proxies': verified})
+        result['proxy-groups'].append({**balance, 'name': QUIC_GROUP, 'icon': QUIC_ICON, 'proxies': verified})
         quic_rules = []
         for rule in result['rules'][1:]:
             match, _, target = rule.removesuffix(',no-resolve').rpartition(',')
