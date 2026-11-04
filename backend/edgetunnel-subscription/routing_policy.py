@@ -70,8 +70,8 @@ def render(current, template, quic_nodes=()):
     if verified:
         if result['rules'][0] != QUIC_REJECT:
             raise ValueError('Missing initial QUIC rejection rule')
-        auto = next(group for group in result['proxy-groups'] if group['name'] == '自动选择')
-        result['proxy-groups'].append({**auto, 'name': QUIC_GROUP, 'proxies': verified})
+        balance = next(group for group in result['proxy-groups'] if group['name'] == '负载均衡')
+        result['proxy-groups'].append({**balance, 'name': QUIC_GROUP, 'proxies': verified})
         quic_rules = []
         for rule in result['rules'][1:]:
             match, _, target = rule.removesuffix(',no-resolve').rpartition(',')
