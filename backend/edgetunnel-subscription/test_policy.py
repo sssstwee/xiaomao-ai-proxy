@@ -73,6 +73,7 @@ class PolicyTest(unittest.TestCase):
             self.assertTrue(all(server.endswith('#' + group) for server in self.template['dns']['nameserver-policy'][key]))
 
     def test_voyra_quic_uses_only_verified_hysteria_nodes_with_reject_fallback(self):
+        self.current['sub-rules'] = None
         self.current['proxies'].append({'name': 'voyra-hy2-warp', 'type': 'hysteria2'})
         verified = ['voyra-hy2-direct', 'voyra-hy2-warp', 'voyra-direct', 'cf-tcp-backup', 'missing']
         config = SYNC.render(self.current, self.template, verified)

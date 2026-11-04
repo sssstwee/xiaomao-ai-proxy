@@ -61,9 +61,10 @@ def render(current, template, quic_nodes=()):
         group['proxies'] = members
         group.pop('include-all-proxies', None)
 
-    if QUIC_RULES in result.get('sub-rules', {}):
-        del result['sub-rules'][QUIC_RULES]
-        if not result['sub-rules']:
+    sub_rules = result.get('sub-rules') or {}
+    if QUIC_RULES in sub_rules:
+        del sub_rules[QUIC_RULES]
+        if not sub_rules:
             del result['sub-rules']
     verified = [name for name in order if name in quic_nodes and nodes[name]['type'] == 'hysteria2']
     if verified:
@@ -78,7 +79,8 @@ def render(current, template, quic_nodes=()):
             quic_target = QUIC_GROUP if target == '默认代理' else 'REJECT'
             params = ',no-resolve' if rule.endswith(',no-resolve') else ''
             quic_rules.append(f'{match},{quic_target}{params}')
-        result.setdefault('sub-rules', {})[QUIC_RULES] = quic_rules
+        sub_rules[QUIC_RULES] = quic_rules
+        result['sub-rules'] = sub_rules
         result['rules'].insert(0, f'SUB-RULE,({QUIC_MATCH}),{QUIC_RULES}')
     result['harmony-runtime'] = current.get('harmony-runtime', {})
     return result
