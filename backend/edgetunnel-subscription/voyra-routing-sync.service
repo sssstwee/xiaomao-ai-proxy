@@ -5,6 +5,6 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/python3 /opt/edgetunnel-policy/routing_policy.py --mihomo /usr/local/bin/mihomo --mihomo-home /var/lib/voyra-routing
+ExecStart=/usr/bin/python3 /opt/edgetunnel-policy/routing_policy.py --mihomo /usr/local/bin/mihomo --mihomo-home /var/lib/voyra-routing --quic-node voyra-hy2-direct --quic-node voyra-hy2-warp
 TimeoutStartSec=60
 UMask=0077

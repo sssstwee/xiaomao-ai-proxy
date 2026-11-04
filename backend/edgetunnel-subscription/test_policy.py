@@ -72,6 +72,29 @@ class PolicyTest(unittest.TestCase):
         for group, key in [('Claude 专用', 'rule-set:anthropic-bootstrap,anthropic'), ('ChatGPT 专用', 'rule-set:openai-bootstrap,openai')]:
             self.assertTrue(all(server.endswith('#' + group) for server in self.template['dns']['nameserver-policy'][key]))
 
+    def test_voyra_quic_uses_only_verified_hysteria_nodes_with_reject_fallback(self):
+        self.current['sub-rules'] = None
+        self.current['proxies'].append({'name': 'voyra-hy2-warp', 'type': 'hysteria2'})
+        verified = ['voyra-hy2-direct', 'voyra-hy2-warp', 'voyra-direct', 'cf-tcp-backup', 'missing']
+        config = SYNC.render(self.current, self.template, verified)
+        group = next(group for group in config['proxy-groups'] if group['name'] == 'Voyra QUIC')
+        self.assertEqual(group['proxies'], ['voyra-hy2-direct', 'voyra-hy2-warp'])
+        self.assertEqual(group['type'], 'url-test')
+        self.assertEqual(config['rules'][:2], [
+            'SUB-RULE,(AND,((NETWORK,UDP),(DST-PORT,443))),voyra-quic', SYNC.QUIC_REJECT,
+        ])
+        self.assertEqual(config['rules'][1:], self.template['rules'])
+        rules = config['sub-rules']['voyra-quic']
+        self.assertIn('RULE-SET,google,Voyra QUIC', rules)
+        self.assertIn('RULE-SET,cncidr,REJECT,no-resolve', rules)
+        self.assertIn('RULE-SET,anthropic-bootstrap,REJECT,no-resolve', rules)
+        self.assertIn('RULE-SET,openai-bootstrap,REJECT,no-resolve', rules)
+        self.assertTrue(all(',DIRECT' not in rule for rule in rules))
+        self.assertEqual(SYNC.render(config, self.template, verified), config)
+        disabled = SYNC.render(config, self.template, ['voyra-direct', 'missing'])
+        self.assertEqual(disabled['rules'], self.template['rules'])
+        self.assertNotIn('sub-rules', disabled)
+
     def test_node_list_indent_remains_compatible_with_edgetunnel_transport_patch(self):
         config = SYNC.render(self.current, self.template)
         content = SYNC.serialize(config)
