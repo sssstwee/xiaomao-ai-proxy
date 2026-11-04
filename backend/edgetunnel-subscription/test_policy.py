@@ -45,11 +45,13 @@ class PolicyTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             SYNC.render(self.current, self.template)
 
-    def test_selector_preserves_group_references_and_load_balance_expands_nodes(self):
+    def test_selector_defaults_to_ordered_failover_and_preserves_manual_modes(self):
         config = SYNC.render(self.current, self.template)
         groups = {group['name']: group for group in config['proxy-groups']}
         self.assertEqual(groups['默认代理']['type'], 'select')
-        self.assertEqual(groups['默认代理']['proxies'], ['负载均衡', '自动选择'])
+        self.assertEqual(groups['默认代理']['proxies'], ['故障转移', '负载均衡', '自动选择'])
+        self.assertEqual(groups['故障转移']['type'], 'fallback')
+        self.assertEqual(groups['故障转移']['proxies'], [node['name'] for node in config['proxies']])
         self.assertEqual(groups['负载均衡']['type'], 'load-balance')
         self.assertEqual(groups['负载均衡']['strategy'], 'round-robin')
         self.assertEqual(groups['负载均衡']['proxies'], [node['name'] for node in config['proxies']])
