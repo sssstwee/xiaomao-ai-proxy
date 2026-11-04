@@ -79,7 +79,8 @@ class PolicyTest(unittest.TestCase):
         config = SYNC.render(self.current, self.template, verified)
         group = next(group for group in config['proxy-groups'] if group['name'] == 'Voyra QUIC')
         self.assertEqual(group['proxies'], ['voyra-hy2-direct', 'voyra-hy2-warp'])
-        self.assertEqual(group['type'], 'url-test')
+        self.assertEqual(group['type'], 'load-balance')
+        self.assertEqual(group['strategy'], 'round-robin')
         self.assertEqual(config['rules'][:2], [
             'SUB-RULE,(AND,((NETWORK,UDP),(DST-PORT,443))),voyra-quic', SYNC.QUIC_REJECT,
         ])
