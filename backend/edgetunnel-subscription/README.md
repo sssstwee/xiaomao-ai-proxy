@@ -20,7 +20,7 @@ EdgeTunnel 的 `converter.mjs` 通过私有 Service Binding 调用独立 Cloudfl
 
 Voyra 运行 `routing_policy.py`，从同一托管 YAML 更新配置，保留节点参数及原首选顺序、端口和 TUN 等运行设置。安装 `voyra-routing-sync.service` / `.timer` 后每 15 分钟检查一次；写入前使用 Mihomo 验证，原子替换文件，自动保留私有备份。下载或验证失败时保留原订阅，不重启代理节点服务。原订阅 URL 和鉴权保持原值。
 
-Voyra 同步服务通过 `--quic-node` 列出已经实测 HTTP/3 的 Hysteria2 节点。普通代理流量的 UDP/443 使用独立的 `Voyra QUIC` 测速组，原规则命中的直连、拒绝和 AI 流量继续拒绝 UDP/443。原全局拦截保留在子规则之后，作为没有可用 UDP 代理时的兜底。EdgeTunnel 仍使用共享模板中的全局拦截。
+Voyra 同步服务通过 `--quic-node` 列出已经实测 HTTP/3 的 Hysteria2 节点。普通代理流量的 UDP/443 使用独立的 `Voyra QUIC` 轮询负载均衡组，图标为橙色火箭；原规则命中的直连和拒绝流量继续拦截。Claude / ChatGPT 的 UDP/443 仅在 `voyra-hy2-direct` 同时属于已验证列表和对应 AI 专用组时定向到该节点，每条放行后保留同一服务的 REJECT，避免不支持 UDP 时继续匹配到通用组或直连。节点连接失败时 UDP 请求失败，由支持回退的应用另发 TCP 请求；TCP 继续走各自的 fallback 组，其他 AI UDP 端口仍拒绝。原全局拦截保留在子规则之后。EdgeTunnel 仍使用共享模板中的全局拦截。
 
 ```sh
 python3 routing_policy.py --config /opt/voyra-subscription/vpn.yml --mihomo /usr/local/bin/mihomo --mihomo-home /var/lib/voyra-routing --quic-node voyra-hy2-direct --quic-node voyra-hy2-warp
@@ -33,6 +33,6 @@ python3 -m unittest discover -s backend/edgetunnel-subscription -p 'test_*.py' -
 
 ## 公共资源归档
 
-19 个远程规则集、5 个图标和 Voice JSON 全部引用 [sssstwee/edgetunnel/resources](https://github.com/sssstwee/edgetunnel/tree/main/resources)。GeoIP / GeoSite / MetaDB / ASN 四个大数据文件引用该仓库 Releases，并在 `geox-url` 中显式指定；保持 MMDB 模式，每 24 小时更新，避免内核回到默认第三方下载地址。转换层和 Voyra 同步均保留这些字段。5 个 inline 规则集继续保存在本模板。
+19 个远程规则集、5 个共享图标、Voyra QUIC 图标和 Voice JSON 全部引用 [sssstwee/edgetunnel/resources](https://github.com/sssstwee/edgetunnel/tree/main/resources)。GeoIP / GeoSite / MetaDB / ASN 四个大数据文件引用该仓库 Releases，并在 `geox-url` 中显式指定；保持 MMDB 模式，每 24 小时更新，避免内核回到默认第三方下载地址。转换层和 Voyra 同步均保留这些字段。5 个 inline 规则集继续保存在本模板。
 
 资源仓库每天同步已使用的成熟上游数据，保留来源提交、SHA256、许可证及最后可用快照；更新失败不会清空现有资源。规则和图标使用固定的自有 main 地址，Geo 数据使用自有 `releases/latest/download` 地址。业务规则在此处维护，资源来源在资源仓库的 `sources.json` 维护；不要将鉴权和节点凭据复制到公共文件。

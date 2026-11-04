@@ -96,6 +96,35 @@ class PolicyTest(unittest.TestCase):
         self.assertEqual(disabled['rules'], self.template['rules'])
         self.assertNotIn('sub-rules', disabled)
 
+    def test_ai_quic_pins_verified_dedicated_node_before_reject(self):
+        config = SYNC.render(self.current, self.template, ['voyra-hy2-direct'])
+        rules = config['sub-rules']['voyra-quic']
+        ai_providers = ['anthropic-bootstrap', 'anthropic', 'anthropic-ip', 'openai-bootstrap', 'openai', 'openai-voice']
+        for provider in ai_providers:
+            allowed = f'RULE-SET,{provider},voyra-hy2-direct,no-resolve'
+            rejected = f'RULE-SET,{provider},REJECT,no-resolve'
+            position = rules.index(allowed)
+            self.assertEqual(rules[position + 1], rejected)
+            self.assertNotIn(f'AND,((NETWORK,UDP),(RULE-SET,{provider})),REJECT', rules[:position])
+            self.assertLess(position, rules.index('RULE-SET,applications,REJECT'))
+        baseline = SYNC.render(self.current, self.template)
+        self.assertEqual(config['rules'][1:], baseline['rules'])
+        self.assertEqual(config['proxy-groups'][:-1], baseline['proxy-groups'])
+        self.assertEqual(config['dns'], baseline['dns'])
+
+    def test_ai_quic_stays_rejected_without_verified_dedicated_membership(self):
+        self.current['proxies'].append({'name': 'voyra-hy2-warp', 'type': 'hysteria2'})
+        config = SYNC.render(self.current, self.template, ['voyra-hy2-warp'])
+        self.assertFalse(any(',voyra-hy2-direct' in rule for rule in config['sub-rules']['voyra-quic']))
+        for group in self.template['proxy-groups']:
+            if group['name'] in ['Claude 专用', 'ChatGPT 专用']:
+                group['exclude-filter'] += '|^voyra-hy2-direct$'
+        config = SYNC.render(self.current, self.template, ['voyra-hy2-direct', 'voyra-hy2-warp'])
+        rules = config['sub-rules']['voyra-quic']
+        self.assertFalse(any(',voyra-hy2-direct' in rule for rule in rules))
+        self.assertIn('AND,((NETWORK,UDP),(RULE-SET,anthropic-bootstrap)),REJECT', rules)
+        self.assertIn('AND,((NETWORK,UDP),(RULE-SET,openai-bootstrap)),REJECT', rules)
+
     def test_node_list_indent_remains_compatible_with_edgetunnel_transport_patch(self):
         config = SYNC.render(self.current, self.template)
         content = SYNC.serialize(config)
