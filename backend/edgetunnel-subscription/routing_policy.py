@@ -16,6 +16,10 @@ import yaml
 
 TEMPLATE = 'https://raw.githubusercontent.com/sssstwee/xiaomao-ai-proxy/main/backend/edgetunnel-subscription/clash-base.yaml'
 VOICE_SOURCE = 'https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/data/chatgpt-voice.json'
+QUIC_MATCH = 'AND,((NETWORK,UDP),(DST-PORT,443))'
+QUIC_REJECT = f'{QUIC_MATCH},REJECT'
+QUIC_GROUP = 'Voyra QUIC'
+QUIC_RULES = 'voyra-quic'
 
 
 class IndentedDumper(yaml.SafeDumper):
@@ -35,7 +39,7 @@ def download(url, limit=262144):
     return content
 
 
-def render(current, template):
+def render(current, template, quic_nodes=()):
     result = copy.deepcopy(current)
     for key in ['mode', 'ipv6', 'unified-delay', 'proxy-groups', 'rule-providers', 'rules', 'dns']:
         result[key] = copy.deepcopy(template[key])
@@ -56,6 +60,26 @@ def render(current, template):
             raise ValueError('A hosted proxy group has no usable members')
         group['proxies'] = members
         group.pop('include-all-proxies', None)
+
+    if QUIC_RULES in result.get('sub-rules', {}):
+        del result['sub-rules'][QUIC_RULES]
+        if not result['sub-rules']:
+            del result['sub-rules']
+    verified = [name for name in order if name in quic_nodes and nodes[name]['type'] == 'hysteria2']
+    if verified:
+        if result['rules'][0] != QUIC_REJECT:
+            raise ValueError('Missing initial QUIC rejection rule')
+        auto = next(group for group in result['proxy-groups'] if group['name'] == '自动选择')
+        result['proxy-groups'].append({**auto, 'name': QUIC_GROUP, 'proxies': verified})
+        quic_rules = []
+        for rule in result['rules'][1:]:
+            match, _, target = rule.removesuffix(',no-resolve').rpartition(',')
+            # Keep the template's rule order, with every direct or AI route closed to QUIC.
+            quic_target = QUIC_GROUP if target == '默认代理' else 'REJECT'
+            params = ',no-resolve' if rule.endswith(',no-resolve') else ''
+            quic_rules.append(f'{match},{quic_target}{params}')
+        result.setdefault('sub-rules', {})[QUIC_RULES] = quic_rules
+        result['rules'].insert(0, f'SUB-RULE,({QUIC_MATCH}),{QUIC_RULES}')
     result['harmony-runtime'] = current.get('harmony-runtime', {})
     return result
 
@@ -67,6 +91,7 @@ def main():
     parser.add_argument('--output')
     parser.add_argument('--mihomo')
     parser.add_argument('--mihomo-home', default='/var/lib/voyra-routing')
+    parser.add_argument('--quic-node', action='append', default=[])
     args = parser.parse_args()
     target = Path(args.output or args.config)
     current = yaml.safe_load(Path(args.config).read_text())
@@ -84,7 +109,7 @@ def main():
             voice['payload'] = list(dict.fromkeys(prefixes))
         except Exception:
             pass
-    content = serialize(render(current, template))
+    content = serialize(render(current, template, args.quic_node))
     if target.exists() and target.read_bytes() == content:
         print(json.dumps({'changed': False, 'sha256': hashlib.sha256(content).hexdigest()}))
         return

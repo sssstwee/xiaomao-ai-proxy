@@ -20,8 +20,10 @@ EdgeTunnel 的 `converter.mjs` 通过私有 Service Binding 调用独立 Cloudfl
 
 Voyra 运行 `routing_policy.py`，从同一托管 YAML 更新配置，保留节点参数及原首选顺序、端口和 TUN 等运行设置。安装 `voyra-routing-sync.service` / `.timer` 后每 15 分钟检查一次；写入前使用 Mihomo 验证，原子替换文件，自动保留私有备份。下载或验证失败时保留原订阅，不重启代理节点服务。原订阅 URL 和鉴权保持原值。
 
+Voyra 同步服务通过 `--quic-node` 列出已经实测 HTTP/3 的 Hysteria2 节点。普通代理流量的 UDP/443 使用独立的 `Voyra QUIC` 测速组，原规则命中的直连、拒绝和 AI 流量继续拒绝 UDP/443。原全局拦截保留在子规则之后，作为没有可用 UDP 代理时的兜底。EdgeTunnel 仍使用共享模板中的全局拦截。
+
 ```sh
-python3 routing_policy.py --config /opt/voyra-subscription/vpn.yml --mihomo /usr/local/bin/mihomo --mihomo-home /var/lib/voyra-routing
+python3 routing_policy.py --config /opt/voyra-subscription/vpn.yml --mihomo /usr/local/bin/mihomo --mihomo-home /var/lib/voyra-routing --quic-node voyra-hy2-direct --quic-node voyra-hy2-warp
 python3 -m unittest discover -s backend/edgetunnel-subscription -p 'test_*.py' -v
 ```
 
