@@ -21,6 +21,7 @@ QUIC_REJECT = f'{QUIC_MATCH},REJECT'
 QUIC_GROUP = 'Voyra QUIC'
 QUIC_RULES = 'voyra-quic'
 QUIC_ICON = 'https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/icons/QUIC.png'
+AI_QUIC_NODE = 'voyra-hy2-direct'
 
 
 class IndentedDumper(yaml.SafeDumper):
@@ -73,12 +74,20 @@ def render(current, template, quic_nodes=()):
             raise ValueError('Missing initial QUIC rejection rule')
         balance = next(group for group in result['proxy-groups'] if group['name'] == '负载均衡')
         result['proxy-groups'].append({**balance, 'name': QUIC_GROUP, 'icon': QUIC_ICON, 'proxies': verified})
+        ai_groups = {group['name'] for group in result['proxy-groups']
+                     if group['name'] in ['Claude 专用', 'ChatGPT 专用']
+                     and AI_QUIC_NODE in verified and AI_QUIC_NODE in group['proxies']}
         quic_rules = []
         for rule in result['rules'][1:]:
             match, _, target = rule.removesuffix(',no-resolve').rpartition(',')
-            # Keep the template's rule order, with every direct or AI route closed to QUIC.
             quic_target = QUIC_GROUP if target == '默认代理' else 'REJECT'
             params = ',no-resolve' if rule.endswith(',no-resolve') else ''
+            if target in ai_groups:
+                udp_guard = f'AND,((NETWORK,UDP),({match})),REJECT'
+                if quic_rules and quic_rules[-1] == udp_guard:
+                    quic_rules.pop()
+                quic_rules.append(f'{match},{AI_QUIC_NODE}{params}')
+            # Keep a service-specific rejection after AI allow rules if UDP skips the node.
             quic_rules.append(f'{match},{quic_target}{params}')
         sub_rules[QUIC_RULES] = quic_rules
         result['sub-rules'] = sub_rules
