@@ -2,7 +2,7 @@
 
 `acl4ssr.ini` 通过 subconverter 原生 `clash_rule_base` 加载 `clash-base.yaml`。**分组、图标、服务探活、规则集、AI 分流、DNS 和 UDP 防直连规则统一维护在 `clash-base.yaml`。** INI 关闭规则生成与覆盖，EdgeTunnel 的内置转换按模板合并最终配置；模板中的 `include-all-proxies` 由转换层解析为本次订阅的显式成员列表，保留原节点顺序，并完整保留图标及 Mihomo 专有字段。
 
-五个组分别为 `默认代理`（select，默认选择负载均衡）、`负载均衡`（load-balance，round-robin）、`自动选择`（url-test，60 秒，50ms 容差）、`Claude 专用` 和 `ChatGPT 专用`（fallback，90 秒）。负载均衡按新连接轮询可用节点，同一长连接中的请求保持同一节点，单连接带宽不会叠加。图标采用固定版本的 Qure：默认代理为蓝色箭头，负载均衡为绿色环形节点，自动选择为黄色闪电，文件镜像在自有资源仓库。两个 AI 组排除 WARP 和 `cf-tcp-backup`：Voyra 保持 VPS 原生出口，EdgeTunnel 继续使用自己的节点，两者不复制节点凭据。
+`默认代理`（select）默认使用 `故障转移`（fallback，按订阅顺序选择健康节点），也可手动切换至 `负载均衡`（load-balance，round-robin）或 `自动选择`（url-test，60 秒，50ms 容差）。已保存的手动选择需在客户端切换。`Claude 专用` 和 `ChatGPT 专用` 各自使用 fallback（90 秒）。负载均衡按新连接轮询可用节点，同一长连接中的请求保持同一节点，单连接带宽不会叠加。图标采用固定版本的 Qure：默认代理为蓝色箭头，负载均衡为绿色环形节点，自动选择为黄色闪电，文件镜像在自有资源仓库。两个 AI 组排除 WARP 和 `cf-tcp-backup`：Voyra 保持 VPS 原生出口，EdgeTunnel 继续使用自己的节点，两者不复制节点凭据。
 
 Claude / OpenAI 分别使用 MetaCubeX 的每日更新域名规则，并内联已审查的主站、认证、CDN、功能开关和资源域名作为首次启动保障。Claude 专属 Auth0 先于 OpenAI 共用认证；同时保留 Anthropic 官方入站 IP、OpenAI 语音网段和 Artifacts 资源。Voice 网段来自 [OpenAI 官方 JSON](https://openai.com/chatgpt-voice.json)，同步脚本及定制 Worker 刷新时读取自有仓库的 JSON 镜像，失败保留模板快照。
 
