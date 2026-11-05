@@ -12,10 +12,11 @@ proxy-groups:
     url: https://www.gstatic.com/generate_204
     interval: 60
     lazy: false
-    timeout: 4000
+    timeout: 8000
     expected-status: "204"
     max-failed-times: 2
     include-all-proxies: true
+    exclude-filter: ^AI-洛杉矶
   - name: 负载均衡
     icon: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/icons/Round_Robin.png
     type: load-balance
@@ -23,10 +24,11 @@ proxy-groups:
     url: https://www.gstatic.com/generate_204
     interval: 60
     lazy: false
-    timeout: 4000
+    timeout: 8000
     expected-status: "204"
     max-failed-times: 2
     include-all-proxies: true
+    exclude-filter: ^AI-洛杉矶
   - name: 自动选择
     icon: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/icons/Auto.png
     type: url-test
@@ -34,32 +36,35 @@ proxy-groups:
     interval: 60
     tolerance: 50
     lazy: false
-    timeout: 4000
+    timeout: 8000
     expected-status: "204"
     max-failed-times: 2
     include-all-proxies: true
+    exclude-filter: ^AI-洛杉矶
   - name: Claude 专用
     icon: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/icons/Claude.png
     type: fallback
     url: https://api.anthropic.com/v1/models
     interval: 90
     lazy: false
-    timeout: 3000
+    timeout: 8000
     expected-status: "401/405"
     include-all-proxies: true
-    exclude-filter: (?i)warp|^cf-tcp-backup$
+    exclude-filter: (?i)warp|^cf-tcp-backup$|^普通
   - name: ChatGPT 专用
     icon: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/icons/ChatGPT.png
     type: fallback
     url: https://api.openai.com/v1/models
     interval: 90
     lazy: false
-    timeout: 4000
+    timeout: 8000
     expected-status: "401"
     include-all-proxies: true
-    exclude-filter: (?i)warp|^cf-tcp-backup$
+    exclude-filter: (?i)warp|^cf-tcp-backup$|^普通
 rules:
   - AND,((NETWORK,UDP),(DST-PORT,443)),REJECT
+  - AND,((NETWORK,UDP),(RULE-SET,ai-resources)),REJECT
+  - RULE-SET,ai-resources,故障转移,no-resolve
   - AND,((NETWORK,UDP),(RULE-SET,anthropic-bootstrap)),REJECT
   - RULE-SET,anthropic-bootstrap,Claude 专用,no-resolve
   - AND,((NETWORK,UDP),(RULE-SET,anthropic)),REJECT
@@ -73,7 +78,7 @@ rules:
   - AND,((NETWORK,UDP),(RULE-SET,openai-voice)),REJECT
   - RULE-SET,openai-voice,ChatGPT 专用,no-resolve
   - AND,((NETWORK,UDP),(RULE-SET,artifact-resources)),REJECT
-  - RULE-SET,artifact-resources,Claude 专用,no-resolve
+  - RULE-SET,artifact-resources,故障转移,no-resolve
   - RULE-SET,private,DIRECT
   - RULE-SET,lancidr,DIRECT,no-resolve
   - RULE-SET,line,默认代理
@@ -761,6 +766,22 @@ rule-providers:
       - 9.205.250.159/32
       - 9.205.94.183/32
       - 9.205.94.184/32
+  ai-resources:
+    type: inline
+    behavior: domain
+    payload:
+      - servd-anthropic-website.b-cdn.net
+      - openaiapi-site.azureedge.net
+      - openaiassets.blob.core.windows.net
+      - openaicom-api-bdcpf8c6d2e9atf6.z01.azurefd.net
+      - openaicom.imgix.net
+      - openaicomproductionae4b.blob.core.windows.net
+      - production-openaicom-storage.azureedge.net
+      - workos.imgix.net
+      - browser-intake-us5-datadoghq.com
+      - http-intake.logs.us5.datadoghq.com
+      - browser-intake-datadoghq.com
+      - rum.browser-intake-datadoghq.com
   artifact-resources:
     type: inline
     behavior: domain
@@ -789,21 +810,19 @@ dns:
   direct-nameserver-follow-policy: false
   respect-rules: true
   nameserver-policy:
+    rule-set:ai-resources,artifact-resources:
+      - https://cloudflare-dns.com/dns-query#故障转移
+      - https://dns.google/dns-query#故障转移
     rule-set:anthropic-bootstrap,anthropic:
       - https://cloudflare-dns.com/dns-query#Claude 专用
-      - https://dns.google/dns-query#Claude 专用
     rule-set:openai-bootstrap,openai:
       - https://cloudflare-dns.com/dns-query#ChatGPT 专用
-      - https://dns.google/dns-query#ChatGPT 专用
     rule-set:line:
       - https://cloudflare-dns.com/dns-query#默认代理
       - https://dns.google/dns-query#默认代理
     rule-set:ai:
       - https://cloudflare-dns.com/dns-query#故障转移
       - https://dns.google/dns-query#故障转移
-    rule-set:artifact-resources:
-      - https://cloudflare-dns.com/dns-query#Claude 专用
-      - https://dns.google/dns-query#Claude 专用
     rule-set:ai-cn,direct,icloud,apple:
       - https://dns.alidns.com/dns-query
       - https://doh.pub/dns-query
