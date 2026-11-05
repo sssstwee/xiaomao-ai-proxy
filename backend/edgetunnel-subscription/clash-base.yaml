@@ -89,6 +89,7 @@ rules:
   - RULE-SET,google,默认代理
   - RULE-SET,icloud,DIRECT
   - RULE-SET,apple,DIRECT
+  - AND,((NETWORK,TCP),(DOMAIN,perfops2.byte-test.com)),默认代理
   - RULE-SET,direct,DIRECT
   - RULE-SET,cncidr,DIRECT,no-resolve
   - GEOSITE,cn,DIRECT
