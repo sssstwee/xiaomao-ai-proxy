@@ -73,14 +73,14 @@ rules:
   - AND,((NETWORK,UDP),(RULE-SET,openai-voice)),REJECT
   - RULE-SET,openai-voice,ChatGPT 专用,no-resolve
   - AND,((NETWORK,UDP),(RULE-SET,artifact-resources)),REJECT
-  - RULE-SET,artifact-resources,默认代理,no-resolve
+  - RULE-SET,artifact-resources,Claude 专用,no-resolve
   - RULE-SET,private,DIRECT
   - RULE-SET,lancidr,DIRECT,no-resolve
   - RULE-SET,line,默认代理
   - RULE-SET,line-ip,默认代理,no-resolve
   - RULE-SET,applications,DIRECT
   - RULE-SET,ai-cn,DIRECT
-  - RULE-SET,ai,默认代理
+  - RULE-SET,ai,故障转移
   - RULE-SET,reject,REJECT
   - RULE-SET,tld-not-cn,默认代理
   - RULE-SET,gfw,默认代理
@@ -795,9 +795,15 @@ dns:
     rule-set:openai-bootstrap,openai:
       - https://cloudflare-dns.com/dns-query#ChatGPT 专用
       - https://dns.google/dns-query#ChatGPT 专用
-    rule-set:line,ai,artifact-resources:
+    rule-set:line:
       - https://cloudflare-dns.com/dns-query#默认代理
       - https://dns.google/dns-query#默认代理
+    rule-set:ai:
+      - https://cloudflare-dns.com/dns-query#故障转移
+      - https://dns.google/dns-query#故障转移
+    rule-set:artifact-resources:
+      - https://cloudflare-dns.com/dns-query#Claude 专用
+      - https://dns.google/dns-query#Claude 专用
     rule-set:ai-cn,direct,icloud,apple:
       - https://dns.alidns.com/dns-query
       - https://doh.pub/dns-query

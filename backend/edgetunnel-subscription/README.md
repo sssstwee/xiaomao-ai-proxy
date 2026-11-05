@@ -6,6 +6,8 @@
 
 Claude / OpenAI 分别使用 MetaCubeX 的每日更新域名规则，并内联已审查的主站、认证、CDN、功能开关和资源域名作为首次启动保障。Claude 专属 Auth0 先于 OpenAI 共用认证；同时保留 Anthropic 官方入站 IP、OpenAI 语音网段和 Artifacts 资源。Voice 网段来自 [OpenAI 官方 JSON](https://openai.com/chatgpt-voice.json)，同步脚本及定制 Worker 刷新时读取自有仓库的 JSON 镜像，失败保留模板快照。
 
+Claude、OpenAI 的核心域名与 DNS 分别进入各自的独立 fallback。通用海外 AI 的规则与 DNS 使用“故障转移”，即使“默认代理”选择负载均衡也不会轮询 AI 连接。Artifacts 的公共字体和脚本主机及其 DNS 使用“Claude 专用”；这些 CDN 为多个应用共享，其他应用访问同一主机也采用该路径。普通流量仍可手动选择负载均衡，fallback 在健康变化时仍可能切换节点，已有长连接不会自动迁移。
+
 AI DNS 分别经对应代理组使用 Cloudflare 与 Google DoH；国内和私有域名走直连 DNS。Cloudflare DoH 使用 `cloudflare-dns.com` 域名保留 TLS SNI。`proxy-server-nameserver` 单独解析节点域名，避免循环依赖。顶层和 DNS 均关闭 IPv6；全局拒绝 UDP 443 以保留移动网络 QUIC 回落，AI UDP 防直连规则同样保留。模板面向 Mihomo；不保证所有语音客户端都支持 TCP 回落。
 
 EdgeTunnel 后台继续使用原 SUBAPI 和以下 SUBCONFIG，无需更换地址：

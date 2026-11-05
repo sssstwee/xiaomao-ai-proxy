@@ -127,6 +127,49 @@ class PolicyTest(unittest.TestCase):
         self.assertIn('AND,((NETWORK,UDP),(RULE-SET,anthropic-bootstrap)),REJECT', rules)
         self.assertIn('AND,((NETWORK,UDP),(RULE-SET,openai-bootstrap)),REJECT', rules)
 
+    def test_ai_routes_and_dns_cannot_reach_load_balance(self):
+        expected = {
+            'anthropic-bootstrap': 'Claude 专用',
+            'anthropic': 'Claude 专用',
+            'anthropic-ip': 'Claude 专用',
+            'openai-bootstrap': 'ChatGPT 专用',
+            'openai': 'ChatGPT 专用',
+            'openai-voice': 'ChatGPT 专用',
+            'ai': '故障转移',
+            'artifact-resources': 'Claude 专用',
+        }
+        for config in [self.template, SYNC.render(self.current, self.template, ['voyra-hy2-direct'])]:
+            groups = {group['name']: group for group in config['proxy-groups']}
+
+            def reaches_balance(name, seen=None):
+                seen = set() if seen is None else seen
+                if name in seen:
+                    return False
+                seen.add(name)
+                group = groups.get(name, {})
+                return group.get('type') == 'load-balance' or any(
+                    reaches_balance(member, seen) for member in group.get('proxies', [])
+                )
+
+            for rule in config['rules']:
+                parts = rule.split(',')
+                if parts[0] == 'RULE-SET' and parts[1] in expected:
+                    self.assertEqual(parts[2], expected[parts[1]])
+                    self.assertFalse(reaches_balance(parts[2]), rule)
+            for rule in config.get('sub-rules', {}).get('voyra-quic', []):
+                parts = rule.split(',')
+                if parts[0] == 'RULE-SET' and parts[1] in expected:
+                    self.assertIn(parts[2], ['REJECT', 'voyra-hy2-direct'])
+                    self.assertFalse(reaches_balance(parts[2]), rule)
+            for key, servers in config['dns']['nameserver-policy'].items():
+                if not key.startswith('rule-set:'):
+                    continue
+                for provider in key.removeprefix('rule-set:').split(','):
+                    if provider in expected:
+                        self.assertTrue(all(server.endswith('#' + expected[provider]) for server in servers), key)
+                        self.assertTrue(all(not reaches_balance(server.rsplit('#', 1)[-1]) for server in servers), key)
+            self.assertEqual(groups['默认代理']['proxies'], ['故障转移', '负载均衡', '自动选择'])
+
     def test_node_list_indent_remains_compatible_with_edgetunnel_transport_patch(self):
         config = SYNC.render(self.current, self.template)
         content = SYNC.serialize(config)
