@@ -9,11 +9,11 @@ proxy-groups:
   - name: 故障转移
     icon: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/icons/Fallback.png
     type: fallback
-    url: https://www.cloudflare.com/cdn-cgi/trace
+    url: https://www.gstatic.com/generate_204
     interval: 60
     lazy: false
     timeout: 8000
-    expected-status: "200"
+    expected-status: "204"
     max-failed-times: 2
     include-all-proxies: true
     exclude-filter: ^AI-洛杉矶| · AI$
@@ -21,23 +21,23 @@ proxy-groups:
     icon: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/icons/Round_Robin.png
     type: load-balance
     strategy: round-robin
-    url: https://www.cloudflare.com/cdn-cgi/trace
+    url: https://www.gstatic.com/generate_204
     interval: 60
     lazy: false
     timeout: 8000
-    expected-status: "200"
+    expected-status: "204"
     max-failed-times: 2
     include-all-proxies: true
     exclude-filter: ^AI-洛杉矶| · AI$
   - name: 自动选择
     icon: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/icons/Auto.png
     type: url-test
-    url: https://www.cloudflare.com/cdn-cgi/trace
+    url: https://www.gstatic.com/generate_204
     interval: 60
     tolerance: 50
     lazy: false
     timeout: 8000
-    expected-status: "200"
+    expected-status: "204"
     max-failed-times: 2
     include-all-proxies: true
     exclude-filter: ^AI-洛杉矶| · AI$

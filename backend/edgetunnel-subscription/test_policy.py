@@ -187,8 +187,8 @@ class PolicyTest(unittest.TestCase):
                 else 'rule-set:openai-bootstrap,openai']))
         for name in ['故障转移', '负载均衡', '自动选择']:
             self.assertEqual(groups[name]['proxies'], ['198.51.100.1 新加坡 · 普通', '198.51.100.2 洛杉矶 · 普通'])
-            self.assertEqual(groups[name]['url'], 'https://www.cloudflare.com/cdn-cgi/trace')
-            self.assertEqual(groups[name]['expected-status'], '200')
+            self.assertEqual(groups[name]['url'], 'https://www.gstatic.com/generate_204')
+            self.assertEqual(groups[name]['expected-status'], '204')
         rules = config['rules']
         self.assertLess(rules.index('RULE-SET,ai-resources,故障转移,no-resolve'),
                         rules.index('RULE-SET,anthropic-bootstrap,Claude 专用,no-resolve'))
