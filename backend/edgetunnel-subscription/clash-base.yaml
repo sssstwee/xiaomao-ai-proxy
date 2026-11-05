@@ -9,30 +9,30 @@ proxy-groups:
   - name: 故障转移
     icon: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/icons/Fallback.png
     type: fallback
-    url: https://www.gstatic.com/generate_204
+    url: https://cp.cloudflare.com/generate_204
     interval: 60
     lazy: false
     timeout: 8000
     expected-status: "204"
     max-failed-times: 2
     include-all-proxies: true
-    exclude-filter: ^AI-洛杉矶| · AI$
+    exclude-filter: ^普通| · 普通$
   - name: 负载均衡
     icon: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/icons/Round_Robin.png
     type: load-balance
     strategy: round-robin
-    url: https://www.gstatic.com/generate_204
+    url: https://cp.cloudflare.com/generate_204
     interval: 60
     lazy: false
     timeout: 8000
     expected-status: "204"
     max-failed-times: 2
     include-all-proxies: true
-    exclude-filter: ^AI-洛杉矶| · AI$
+    exclude-filter: ^普通| · 普通$
   - name: 自动选择
     icon: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/icons/Auto.png
     type: url-test
-    url: https://www.gstatic.com/generate_204
+    url: https://cp.cloudflare.com/generate_204
     interval: 60
     tolerance: 50
     lazy: false
@@ -40,7 +40,7 @@ proxy-groups:
     expected-status: "204"
     max-failed-times: 2
     include-all-proxies: true
-    exclude-filter: ^AI-洛杉矶| · AI$
+    exclude-filter: ^普通| · 普通$
   - name: Claude 专用
     icon: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/icons/Claude.png
     type: fallback
