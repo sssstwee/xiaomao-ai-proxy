@@ -6,11 +6,11 @@
 
 Claude / OpenAI 分别使用 MetaCubeX 的每日更新域名规则，并内联已审查的主站、认证、CDN、功能开关和资源域名作为首次启动保障。Claude 专属 Auth0 先于 OpenAI 共用认证；同时保留 Anthropic 官方入站 IP、OpenAI 语音网段和 Artifacts 资源。Voice 网段来自 [OpenAI 官方 JSON](https://openai.com/chatgpt-voice.json)，同步脚本及定制 Worker 刷新时读取自有仓库的 JSON 镜像，失败保留模板快照。
 
-Claude、OpenAI 的核心域名与 DNS 分别进入各自的独立 fallback。通用海外 AI 的规则与 DNS 使用“故障转移”，即使“默认代理”选择负载均衡也不会轮询 AI 连接。Artifacts 的公共字体和脚本、公共 CDN 与遥测主机及其 DNS 使用“故障转移”；公共依赖规则先于 AI 核心规则，避免严格回源的 TLS 握手失败。这些 CDN 为多个应用共享，其他应用访问同一主机也采用该路径。普通流量仍可手动选择负载均衡，fallback 在健康变化时仍可能切换节点，已有长连接不会自动迁移。
+Claude、OpenAI 的核心域名与 DNS 分别进入各自的独立 fallback。通用海外 AI 的规则与 DNS 使用“故障转移”，即使“默认代理”选择负载均衡也不会轮询 AI 连接。Artifacts 的公共字体和脚本、公共 CDN 与遥测主机及其 DNS 使用“故障转移”；公共依赖规则先于 AI 核心规则；EdgeTunnel 当前共用严格节点，因此不能保证这些公共依赖的 TLS 兼容性。这些 CDN 为多个应用共享，其他应用访问同一主机也采用该路径。普通流量仍可手动选择负载均衡，fallback 在健康变化时仍可能切换节点，已有长连接不会自动迁移。
 
 Claude / ChatGPT 核心 DNS 分别经对应严格代理组使用 Cloudflare DoH；严格回源不能可靠访问 Google DoH，因此不将其放入这两个 DNS 策略。普通及公共依赖 DNS 保留 Cloudflare 与 Google DoH；国内和私有域名走直连 DNS。Cloudflare DoH 使用 `cloudflare-dns.com` 域名保留 TLS SNI。`proxy-server-nameserver` 单独解析节点域名，避免循环依赖。顶层和 DNS 均关闭 IPv6；全局拒绝 UDP 443 以保留移动网络 QUIC 回落，AI UDP 防直连规则同样保留。模板面向 Mihomo；不保证所有语音客户端都支持 TCP 回落。
 
-EdgeTunnel 名单分为 `洛杉矶NN · AI`（`/proxyip-only=`）和 `新加坡NN · 普通` / `洛杉矶NN · 普通`（`/proxyip=`）两套，各默认十六条。Claude / ChatGPT 的独立 fallback 排除普通节点；普通故障转移、负载均衡和自动选择排除严格 AI 节点。普通池优先新加坡和洛杉矶，排除香港；按三轮真实 HTTPS Cloudflare trace 的中位首字节耗时筛选，组内按该结果排序。普通组三个探活地址使用支持 HEAD 的 `https://www.gstatic.com/generate_204`（预期 204），验证真实 Google 连接；Cloudflare trace 的 GET 仅用于独立出口核验，不作为自动探活。实测 trace 的 HEAD 返回 404，若要求 200 会将可达节点误判失效。Mihomo URLTest 仍可能返回一个数值延迟；判断探活还必须核对对应 URL 的 `extra.alive` 与响应状态，不能只检查 API 返回 delay。Google / YouTube 主页继续另行验收。非 Cloudflare 目标可能经 Worker 直接出站，另测 AWS 公网回显排除香港，不能把节点标签当作所有目标的固定出口承诺。严格路径只承诺已实测的核心 HTTPS 目的地，不能当作通用 TCP 出口；普通路径支持非 Cloudflare 网站，但不承诺其出口固定洛杉矶。通用 AI（例如 Gemini）继续走普通故障转移，不进入负载均衡。AI 节点在客户端按组内 API 地址测速；全节点 Google 测速不适合严格节点。
+EdgeTunnel 按用户最新要求，仅保留原 AI 组的十六条 `洛杉矶NN · AI`（`/proxyip-only=`）节点，移除原十条普通节点。普通故障转移、负载均衡、自动选择与 Claude / ChatGPT 专用组共用这些节点；两个 AI 组仍为独立 fallback，AI 规则、DNS 与 UDP/443 防直连策略保持原样。普通组三个探活地址使用支持 HEAD 的 `https://cp.cloudflare.com/generate_204`（预期 204），严格路径不在 Worker 本地合成测速响应；API 专用组继续使用各自 API 探活。判断探活还须核对对应 URL 的 `extra.alive` 与响应状态，不能只检查返回 delay。Cloudflare trace 仅用 GET 做独立出口核验。严格路径此前对 Google / YouTube 及部分公共资源出现 TLS 失败，共用节点不代表通用网站兼容性已解决，也不承诺 ≤250ms。Voyra 的普通组成员不变；共享探活地址已单独验证其现有六条节点。
 
 EdgeTunnel 后台继续使用原 SUBAPI 和以下 SUBCONFIG，无需更换地址：
 

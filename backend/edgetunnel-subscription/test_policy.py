@@ -171,7 +171,7 @@ class PolicyTest(unittest.TestCase):
                         self.assertTrue(all(not reaches_balance(server.rsplit('#', 1)[-1]) for server in servers), key)
             self.assertEqual(groups['默认代理']['proxies'], ['故障转移', '负载均衡', '自动选择'])
 
-    def test_edgetunnel_strict_ai_and_ordinary_pools_are_separate(self):
+    def test_edgetunnel_ordinary_groups_reuse_strict_ai_pool(self):
         self.current['proxies'] = [
             {'name': '192.0.2.1 洛杉矶 · AI', 'type': 'vless'},
             {'name': '198.51.100.1 新加坡 · 普通', 'type': 'vless'},
@@ -186,8 +186,8 @@ class PolicyTest(unittest.TestCase):
                 'rule-set:anthropic-bootstrap,anthropic' if name == 'Claude 专用'
                 else 'rule-set:openai-bootstrap,openai']))
         for name in ['故障转移', '负载均衡', '自动选择']:
-            self.assertEqual(groups[name]['proxies'], ['198.51.100.1 新加坡 · 普通', '198.51.100.2 洛杉矶 · 普通'])
-            self.assertEqual(groups[name]['url'], 'https://www.gstatic.com/generate_204')
+            self.assertEqual(groups[name]['proxies'], ['192.0.2.1 洛杉矶 · AI', '192.0.2.2 洛杉矶 · AI'])
+            self.assertEqual(groups[name]['url'], 'https://cp.cloudflare.com/generate_204')
             self.assertEqual(groups[name]['expected-status'], '204')
         rules = config['rules']
         self.assertLess(rules.index('RULE-SET,ai-resources,故障转移,no-resolve'),
