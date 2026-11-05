@@ -173,20 +173,20 @@ class PolicyTest(unittest.TestCase):
 
     def test_edgetunnel_strict_ai_and_ordinary_pools_are_separate(self):
         self.current['proxies'] = [
-            {'name': 'AI-洛杉矶01', 'type': 'vless'},
-            {'name': '普通01', 'type': 'vless'},
-            {'name': 'AI-洛杉矶02', 'type': 'vless'},
-            {'name': '普通02', 'type': 'vless'},
+            {'name': '192.0.2.1 洛杉矶 · AI', 'type': 'vless'},
+            {'name': '198.51.100.1 新加坡 · 普通', 'type': 'vless'},
+            {'name': '192.0.2.2 洛杉矶 · AI', 'type': 'vless'},
+            {'name': '198.51.100.2 洛杉矶 · 普通', 'type': 'vless'},
         ]
         config = SYNC.render(self.current, self.template)
         groups = {group['name']: group for group in config['proxy-groups']}
         for name in ['Claude 专用', 'ChatGPT 专用']:
-            self.assertEqual(groups[name]['proxies'], ['AI-洛杉矶01', 'AI-洛杉矶02'])
+            self.assertEqual(groups[name]['proxies'], ['192.0.2.1 洛杉矶 · AI', '192.0.2.2 洛杉矶 · AI'])
             self.assertNotIn('dns.google', str(config['dns']['nameserver-policy'][
                 'rule-set:anthropic-bootstrap,anthropic' if name == 'Claude 专用'
                 else 'rule-set:openai-bootstrap,openai']))
         for name in ['故障转移', '负载均衡', '自动选择']:
-            self.assertEqual(groups[name]['proxies'], ['普通01', '普通02'])
+            self.assertEqual(groups[name]['proxies'], ['198.51.100.1 新加坡 · 普通', '198.51.100.2 洛杉矶 · 普通'])
             self.assertEqual(groups[name]['url'], 'https://www.cloudflare.com/cdn-cgi/trace')
             self.assertEqual(groups[name]['expected-status'], '200')
         rules = config['rules']

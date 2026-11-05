@@ -2,7 +2,7 @@
 
 `acl4ssr.ini` 通过 subconverter 原生 `clash_rule_base` 加载 `clash-base.yaml`。**分组、图标、服务探活、规则集、AI 分流、DNS 和 UDP 防直连规则统一维护在 `clash-base.yaml`。** INI 关闭规则生成与覆盖，EdgeTunnel 的内置转换按模板合并最终配置；模板中的 `include-all-proxies` 由转换层解析为本次订阅的显式成员列表，保留原节点顺序，并完整保留图标及 Mihomo 专有字段。
 
-`默认代理`（select）默认使用 `故障转移`（fallback，按订阅顺序选择健康节点），也可手动切换至 `负载均衡`（load-balance，round-robin）或 `自动选择`（url-test，60 秒，50ms 容差）。已保存的手动选择需在客户端切换。`Claude 专用` 和 `ChatGPT 专用` 各自使用 fallback（90 秒）。负载均衡按新连接轮询可用节点，同一长连接中的请求保持同一节点，单连接带宽不会叠加。图标采用固定版本的 Qure：默认代理为蓝色箭头，负载均衡为绿色环形节点，自动选择为黄色闪电，故障转移为绿色心跳，文件镜像在自有资源仓库。两个 AI 组排除 WARP、`cf-tcp-backup` 和 `普通` 前缀节点：Voyra 保持 VPS 原生出口，EdgeTunnel 继续使用自己的节点，两者不复制节点凭据。
+`默认代理`（select）默认使用 `故障转移`（fallback，按订阅顺序选择健康节点），也可手动切换至 `负载均衡`（load-balance，round-robin）或 `自动选择`（url-test，60 秒，50ms 容差）。已保存的手动选择需在客户端切换。`Claude 专用` 和 `ChatGPT 专用` 各自使用 fallback（90 秒）。负载均衡按新连接轮询可用节点，同一长连接中的请求保持同一节点，单连接带宽不会叠加。图标采用固定版本的 Qure：默认代理为蓝色箭头，负载均衡为绿色环形节点，自动选择为黄色闪电，故障转移为绿色心跳，文件镜像在自有资源仓库。两个 AI 组排除 WARP、`cf-tcp-backup` 和 `普通` 标识节点：Voyra 保持 VPS 原生出口，EdgeTunnel 继续使用自己的节点，两者不复制节点凭据。
 
 Claude / OpenAI 分别使用 MetaCubeX 的每日更新域名规则，并内联已审查的主站、认证、CDN、功能开关和资源域名作为首次启动保障。Claude 专属 Auth0 先于 OpenAI 共用认证；同时保留 Anthropic 官方入站 IP、OpenAI 语音网段和 Artifacts 资源。Voice 网段来自 [OpenAI 官方 JSON](https://openai.com/chatgpt-voice.json)，同步脚本及定制 Worker 刷新时读取自有仓库的 JSON 镜像，失败保留模板快照。
 
@@ -10,7 +10,7 @@ Claude、OpenAI 的核心域名与 DNS 分别进入各自的独立 fallback。�
 
 Claude / ChatGPT 核心 DNS 分别经对应严格代理组使用 Cloudflare DoH；严格回源不能可靠访问 Google DoH，因此不将其放入这两个 DNS 策略。普通及公共依赖 DNS 保留 Cloudflare 与 Google DoH；国内和私有域名走直连 DNS。Cloudflare DoH 使用 `cloudflare-dns.com` 域名保留 TLS SNI。`proxy-server-nameserver` 单独解析节点域名，避免循环依赖。顶层和 DNS 均关闭 IPv6；全局拒绝 UDP 443 以保留移动网络 QUIC 回落，AI UDP 防直连规则同样保留。模板面向 Mihomo；不保证所有语音客户端都支持 TCP 回落。
 
-EdgeTunnel 名单分为 `AI-洛杉矶NN`（`/proxyip-only=`）和 `普通新加坡NN` / `普通洛杉矶NN`（`/proxyip=`）两套，各默认十六条。Claude / ChatGPT 的独立 fallback 排除普通节点；普通故障转移、负载均衡和自动选择排除严格 AI 节点。普通池优先新加坡和洛杉矶，排除香港；按三轮真实 HTTPS Cloudflare trace 的中位首字节耗时筛选，组内按该结果排序。普通组三个探活地址同样使用 Cloudflare trace（预期 200），验证实际回源；Google / YouTube 主页另行验收。非 Cloudflare 目标可能经 Worker 直接出站，另测 AWS 公网回显排除香港，不能把节点标签当作所有目标的固定出口承诺。严格路径只承诺已实测的核心 HTTPS 目的地，不能当作通用 TCP 出口；普通路径支持非 Cloudflare 网站，但不承诺其出口固定洛杉矶。通用 AI（例如 Gemini）继续走普通故障转移，不进入负载均衡。AI 节点在客户端按组内 API 地址测速；全节点 Google 测速不适合严格节点。
+EdgeTunnel 名单分为 `回源IP 洛杉矶 · AI`（`/proxyip-only=`）和 `回源IP 新加坡 · 普通` / `回源IP 洛杉矶 · 普通`（`/proxyip=`）两套，各默认十六条。Claude / ChatGPT 的独立 fallback 排除普通节点；普通故障转移、负载均衡和自动选择排除严格 AI 节点。普通池优先新加坡和洛杉矶，排除香港；按三轮真实 HTTPS Cloudflare trace 的中位首字节耗时筛选，组内按该结果排序。普通组三个探活地址同样使用 Cloudflare trace（预期 200），验证实际回源；Google / YouTube 主页另行验收。非 Cloudflare 目标可能经 Worker 直接出站，另测 AWS 公网回显排除香港，不能把节点标签当作所有目标的固定出口承诺。严格路径只承诺已实测的核心 HTTPS 目的地，不能当作通用 TCP 出口；普通路径支持非 Cloudflare 网站，但不承诺其出口固定洛杉矶。通用 AI（例如 Gemini）继续走普通故障转移，不进入负载均衡。AI 节点在客户端按组内 API 地址测速；全节点 Google 测速不适合严格节点。
 
 EdgeTunnel 后台继续使用原 SUBAPI 和以下 SUBCONFIG，无需更换地址：
 
