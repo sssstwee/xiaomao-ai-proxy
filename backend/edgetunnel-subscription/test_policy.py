@@ -136,7 +136,8 @@ class PolicyTest(unittest.TestCase):
             'openai': 'ChatGPT 专用',
             'openai-voice': 'ChatGPT 专用',
             'ai': '故障转移',
-            'artifact-resources': 'Claude 专用',
+            'artifact-resources': '故障转移',
+            'ai-resources': '故障转移',
         }
         for config in [self.template, SYNC.render(self.current, self.template, ['voyra-hy2-direct'])]:
             groups = {group['name']: group for group in config['proxy-groups']}
@@ -169,6 +170,31 @@ class PolicyTest(unittest.TestCase):
                         self.assertTrue(all(server.endswith('#' + expected[provider]) for server in servers), key)
                         self.assertTrue(all(not reaches_balance(server.rsplit('#', 1)[-1]) for server in servers), key)
             self.assertEqual(groups['默认代理']['proxies'], ['故障转移', '负载均衡', '自动选择'])
+
+    def test_edgetunnel_strict_ai_and_ordinary_pools_are_separate(self):
+        self.current['proxies'] = [
+            {'name': 'AI-洛杉矶01', 'type': 'vless'},
+            {'name': '普通01', 'type': 'vless'},
+            {'name': 'AI-洛杉矶02', 'type': 'vless'},
+            {'name': '普通02', 'type': 'vless'},
+        ]
+        config = SYNC.render(self.current, self.template)
+        groups = {group['name']: group for group in config['proxy-groups']}
+        for name in ['Claude 专用', 'ChatGPT 专用']:
+            self.assertEqual(groups[name]['proxies'], ['AI-洛杉矶01', 'AI-洛杉矶02'])
+            self.assertNotIn('dns.google', str(config['dns']['nameserver-policy'][
+                'rule-set:anthropic-bootstrap,anthropic' if name == 'Claude 专用'
+                else 'rule-set:openai-bootstrap,openai']))
+        for name in ['故障转移', '负载均衡', '自动选择']:
+            self.assertEqual(groups[name]['proxies'], ['普通01', '普通02'])
+        rules = config['rules']
+        self.assertLess(rules.index('RULE-SET,ai-resources,故障转移,no-resolve'),
+                        rules.index('RULE-SET,anthropic-bootstrap,Claude 专用,no-resolve'))
+        self.assertIn('openaiassets.blob.core.windows.net',
+                      config['rule-providers']['ai-resources']['payload'])
+        self.current['proxies'] = self.current['proxies'][1::2]
+        with self.assertRaises(ValueError):
+            SYNC.render(self.current, self.template)
 
     def test_node_list_indent_remains_compatible_with_edgetunnel_transport_patch(self):
         config = SYNC.render(self.current, self.template)
