@@ -16,7 +16,7 @@ proxy-groups:
     expected-status: "200"
     max-failed-times: 2
     include-all-proxies: true
-    exclude-filter: ^AI-洛杉矶
+    exclude-filter: ^AI-洛杉矶| · AI$
   - name: 负载均衡
     icon: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/icons/Round_Robin.png
     type: load-balance
@@ -28,7 +28,7 @@ proxy-groups:
     expected-status: "200"
     max-failed-times: 2
     include-all-proxies: true
-    exclude-filter: ^AI-洛杉矶
+    exclude-filter: ^AI-洛杉矶| · AI$
   - name: 自动选择
     icon: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/icons/Auto.png
     type: url-test
@@ -40,7 +40,7 @@ proxy-groups:
     expected-status: "200"
     max-failed-times: 2
     include-all-proxies: true
-    exclude-filter: ^AI-洛杉矶
+    exclude-filter: ^AI-洛杉矶| · AI$
   - name: Claude 专用
     icon: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/icons/Claude.png
     type: fallback
@@ -50,7 +50,7 @@ proxy-groups:
     timeout: 8000
     expected-status: "401/405"
     include-all-proxies: true
-    exclude-filter: (?i)warp|^cf-tcp-backup$|^普通
+    exclude-filter: (?i)warp|^cf-tcp-backup$|^普通| · 普通$
   - name: ChatGPT 专用
     icon: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/icons/ChatGPT.png
     type: fallback
@@ -60,7 +60,7 @@ proxy-groups:
     timeout: 8000
     expected-status: "401"
     include-all-proxies: true
-    exclude-filter: (?i)warp|^cf-tcp-backup$|^普通
+    exclude-filter: (?i)warp|^cf-tcp-backup$|^普通| · 普通$
 rules:
   - AND,((NETWORK,UDP),(DST-PORT,443)),REJECT
   - AND,((NETWORK,UDP),(RULE-SET,ai-resources)),REJECT
