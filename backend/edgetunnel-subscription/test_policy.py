@@ -187,6 +187,8 @@ class PolicyTest(unittest.TestCase):
                 else 'rule-set:openai-bootstrap,openai']))
         for name in ['故障转移', '负载均衡', '自动选择']:
             self.assertEqual(groups[name]['proxies'], ['普通01', '普通02'])
+            self.assertEqual(groups[name]['url'], 'https://www.cloudflare.com/cdn-cgi/trace')
+            self.assertEqual(groups[name]['expected-status'], '200')
         rules = config['rules']
         self.assertLess(rules.index('RULE-SET,ai-resources,故障转移,no-resolve'),
                         rules.index('RULE-SET,anthropic-bootstrap,Claude 专用,no-resolve'))
