@@ -10,7 +10,7 @@ Claude、OpenAI 的核心域名与 DNS 分别进入各自的独立 fallback。�
 
 Claude / ChatGPT 核心 DNS 分别经对应严格代理组使用 Cloudflare DoH；严格回源不能可靠访问 Google DoH，因此不将其放入这两个 DNS 策略。普通及公共依赖 DNS 保留 Cloudflare 与 Google DoH；国内和私有域名走直连 DNS。Cloudflare DoH 使用 `cloudflare-dns.com` 域名保留 TLS SNI。`proxy-server-nameserver` 单独解析节点域名，避免循环依赖。顶层和 DNS 均关闭 IPv6；全局拒绝 UDP 443 以保留移动网络 QUIC 回落，AI UDP 防直连规则同样保留。模板面向 Mihomo；不保证所有语音客户端都支持 TCP 回落。
 
-EdgeTunnel 名单分为 `AI-洛杉矶NN`（`/proxyip-only=`）和 `普通NN`（`/proxyip=`）两套，各默认十六条。Claude / ChatGPT 的独立 fallback 排除普通节点；普通故障转移、负载均衡和自动选择排除严格 AI 节点。严格路径只承诺已实测的核心 HTTPS 目的地，不能当作通用 TCP 出口；普通路径支持非 Cloudflare 网站，但不承诺其出口固定洛杉矶。通用 AI（例如 Gemini）继续走普通故障转移，不进入负载均衡。AI 节点在客户端按组内 API 地址测速；全节点 Google 测速不适合严格节点。
+EdgeTunnel 名单分为 `AI-洛杉矶NN`（`/proxyip-only=`）和 `普通新加坡NN` / `普通洛杉矶NN`（`/proxyip=`）两套，各默认十六条。Claude / ChatGPT 的独立 fallback 排除普通节点；普通故障转移、负载均衡和自动选择排除严格 AI 节点。普通池优先新加坡和洛杉矶，排除香港；按三轮真实 HTTPS Cloudflare trace 的中位首字节耗时筛选，组内按该结果排序。普通组三个探活地址同样使用 Cloudflare trace（预期 200），验证实际回源；Google / YouTube 主页另行验收。非 Cloudflare 目标可能经 Worker 直接出站，另测 AWS 公网回显排除香港，不能把节点标签当作所有目标的固定出口承诺。严格路径只承诺已实测的核心 HTTPS 目的地，不能当作通用 TCP 出口；普通路径支持非 Cloudflare 网站，但不承诺其出口固定洛杉矶。通用 AI（例如 Gemini）继续走普通故障转移，不进入负载均衡。AI 节点在客户端按组内 API 地址测速；全节点 Google 测速不适合严格节点。
 
 EdgeTunnel 后台继续使用原 SUBAPI 和以下 SUBCONFIG，无需更换地址：
 
