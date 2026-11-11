@@ -72,8 +72,10 @@ def render(current, template, quic_nodes=()):
     if verified:
         if result['rules'][0] != QUIC_REJECT:
             raise ValueError('Missing initial QUIC rejection rule')
-        balance = next(group for group in result['proxy-groups'] if group['name'] == '负载均衡')
-        result['proxy-groups'].append({**balance, 'name': QUIC_GROUP, 'icon': QUIC_ICON, 'proxies': verified})
+        balance = next(group for group in result['proxy-groups'] if group['name'] == '自动选择')
+        quic_group = {key: value for key, value in balance.items() if key != 'tolerance'}
+        result['proxy-groups'].append({**quic_group, 'name': QUIC_GROUP, 'icon': QUIC_ICON, 'type': 'load-balance',
+                                       'strategy': 'round-robin', 'proxies': verified})
         ai_groups = {group['name'] for group in result['proxy-groups']
                      if group['name'] in ['Claude 专用', 'ChatGPT 专用']
                      and AI_QUIC_NODE in verified and AI_QUIC_NODE in group['proxies']}

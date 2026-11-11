@@ -2,15 +2,15 @@
 
 `acl4ssr.ini` 通过 subconverter 原生 `clash_rule_base` 加载 `clash-base.yaml`。**分组、图标、服务探活、规则集、AI 分流、DNS 和 UDP 防直连规则统一维护在 `clash-base.yaml`。** INI 关闭规则生成与覆盖，EdgeTunnel 的内置转换按模板合并最终配置；模板中的 `include-all-proxies` 由转换层解析为本次订阅的显式成员列表，保留原节点顺序，并完整保留图标及 Mihomo 专有字段。
 
-`默认代理`（select）默认使用 `故障转移`（fallback，按订阅顺序选择健康节点），也可手动切换至 `负载均衡`（load-balance，round-robin）或 `自动选择`（url-test，60 秒，50ms 容差）。已保存的手动选择需在客户端切换。`Claude 专用` 和 `ChatGPT 专用` 各自使用 fallback（90 秒）。负载均衡按新连接轮询可用节点，同一长连接中的请求保持同一节点，单连接带宽不会叠加。图标采用固定版本的 Qure：默认代理为蓝色箭头，负载均衡为绿色环形节点，自动选择为黄色闪电，故障转移为绿色心跳，文件镜像在自有资源仓库。两个 AI 组排除 WARP、`cf-tcp-backup` 和 `普通` 标识节点：Voyra 保持 VPS 原生出口，EdgeTunnel 继续使用自己的节点，两者不复制节点凭据。
+`默认代理`（select）包含 `自动选择`（url-test，300 秒，100ms 容差）和 `故障转移`（fallback，按订阅顺序选择健康节点，300 秒）。2026-11-11 起移除 `负载均衡`（round-robin），健康检查统一为 timeout 5000、lazy true、max-failed-times 3，以减少对 Worker 的探活请求。已保存的手动选择需在客户端切换。`Claude 专用` 和 `ChatGPT 专用` 各自使用 fallback（600 秒）。图标采用固定版本的 Qure：默认代理为蓝色箭头，自动选择为黄色闪电，故障转移为绿色心跳，文件镜像在自有资源仓库。两个 AI 组排除 WARP、`cf-tcp-backup` 和 `普通` 标识节点：Voyra 保持 VPS 原生出口，EdgeTunnel 继续使用自己的节点，两者不复制节点凭据。
 
 Claude / OpenAI 分别使用 MetaCubeX 的每日更新域名规则，并内联已审查的主站、认证、CDN、功能开关和资源域名作为首次启动保障。Claude 专属 Auth0 先于 OpenAI 共用认证；同时保留 Anthropic 官方入站 IP、OpenAI 语音网段和 Artifacts 资源。Voice 网段来自 [OpenAI 官方 JSON](https://openai.com/chatgpt-voice.json)，同步脚本及定制 Worker 刷新时读取自有仓库的 JSON 镜像，失败保留模板快照。
 
-Claude、OpenAI 的核心域名与 DNS 分别进入各自的独立 fallback。通用海外 AI 的规则与 DNS 使用“故障转移”，即使“默认代理”选择负载均衡也不会轮询 AI 连接。Artifacts 的公共字体和脚本、公共 CDN 与遥测主机及其 DNS 使用“故障转移”；公共依赖规则先于 AI 核心规则；EdgeTunnel 当前共用严格节点，因此不能保证这些公共依赖的 TLS 兼容性。这些 CDN 为多个应用共享，其他应用访问同一主机也采用该路径。普通流量仍可手动选择负载均衡，fallback 在健康变化时仍可能切换节点，已有长连接不会自动迁移。
+Claude、OpenAI 的核心域名与 DNS 分别进入各自的独立 fallback。通用海外 AI 的规则与 DNS 使用“故障转移”，AI 连接不随“默认代理”的选择切换。Artifacts 的公共字体和脚本、公共 CDN 与遥测主机及其 DNS 使用“故障转移”；公共依赖规则先于 AI 核心规则；EdgeTunnel 当前共用严格节点，因此不能保证这些公共依赖的 TLS 兼容性。这些 CDN 为多个应用共享，其他应用访问同一主机也采用该路径。fallback 在健康变化时仍可能切换节点，已有长连接不会自动迁移。
 
 Claude / ChatGPT 核心 DNS 分别经对应严格代理组使用 Cloudflare DoH；严格回源不能可靠访问 Google DoH，因此不将其放入这两个 DNS 策略。普通及公共依赖 DNS 保留 Cloudflare 与 Google DoH；国内和私有域名走直连 DNS。Cloudflare DoH 使用 `cloudflare-dns.com` 域名保留 TLS SNI。`proxy-server-nameserver` 单独解析节点域名，避免循环依赖。顶层和 DNS 均关闭 IPv6；全局拒绝 UDP 443 以保留移动网络 QUIC 回落，AI UDP 防直连规则同样保留。模板面向 Mihomo；不保证所有语音客户端都支持 TCP 回落。
 
-EdgeTunnel 按用户最新要求，仅保留原 AI 组的十六条 `洛杉矶NN · AI`（`/proxyip-only=`）节点，移除原十条普通节点。普通故障转移、负载均衡、自动选择与 Claude / ChatGPT 专用组共用这些节点；两个 AI 组仍为独立 fallback，AI 规则、DNS 与 UDP/443 防直连策略保持原样。普通组三个探活地址使用支持 HEAD 的 `https://cp.cloudflare.com/generate_204`（预期 204），严格路径不在 Worker 本地合成测速响应；API 专用组继续使用各自 API 探活。判断探活还须核对对应 URL 的 `extra.alive` 与响应状态，不能只检查返回 delay。Cloudflare trace 仅用 GET 做独立出口核验。严格路径此前对 Google / YouTube 及部分公共资源出现 TLS 失败，共用节点不代表通用网站兼容性已解决，也不承诺 ≤250ms。Voyra 的普通组成员不变；共享探活地址已单独验证其现有六条节点。
+EdgeTunnel 按用户最新要求，仅保留原 AI 组的十六条 `洛杉矶NN · AI`（`/proxyip-only=`）节点，移除原十条普通节点。普通故障转移、自动选择与 Claude / ChatGPT 专用组共用这些节点；两个 AI 组仍为独立 fallback，AI 规则、DNS 与 UDP/443 防直连策略保持原样。普通组两个探活地址使用支持 HEAD 的 `https://cp.cloudflare.com/generate_204`（预期 204），严格路径不在 Worker 本地合成测速响应；API 专用组继续使用各自 API 探活。判断探活还须核对对应 URL 的 `extra.alive` 与响应状态，不能只检查返回 delay。Cloudflare trace 仅用 GET 做独立出口核验。严格路径此前对 Google / YouTube 及部分公共资源出现 TLS 失败，共用节点不代表通用网站兼容性已解决，也不承诺 ≤250ms。Voyra 的普通组成员不变；共享探活地址已单独验证其现有六条节点。
 
 EdgeTunnel 后台继续使用原 SUBAPI 和以下 SUBCONFIG，无需更换地址：
 

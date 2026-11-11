@@ -49,14 +49,17 @@ class PolicyTest(unittest.TestCase):
         config = SYNC.render(self.current, self.template)
         groups = {group['name']: group for group in config['proxy-groups']}
         self.assertEqual(groups['默认代理']['type'], 'select')
-        self.assertEqual(groups['默认代理']['proxies'], ['故障转移', '负载均衡', '自动选择'])
+        self.assertEqual(groups['默认代理']['proxies'], ['自动选择', '故障转移'])
         self.assertEqual(groups['故障转移']['type'], 'fallback')
         self.assertEqual(groups['故障转移']['proxies'], [node['name'] for node in config['proxies']])
-        self.assertEqual(groups['负载均衡']['type'], 'load-balance')
-        self.assertEqual(groups['负载均衡']['strategy'], 'round-robin')
-        self.assertEqual(groups['负载均衡']['proxies'], [node['name'] for node in config['proxies']])
+        self.assertNotIn('负载均衡', groups)
         self.assertEqual(groups['自动选择']['type'], 'url-test')
-        self.assertEqual(groups['自动选择']['proxies'], groups['负载均衡']['proxies'])
+        self.assertEqual(groups['自动选择']['proxies'], groups['故障转移']['proxies'])
+        for name in ['故障转移', '自动选择']:
+            self.assertEqual((groups[name]['interval'], groups[name]['timeout'], groups[name]['lazy'], groups[name]['max-failed-times']), (300, 5000, True, 3))
+        self.assertEqual(groups['自动选择']['tolerance'], 100)
+        for name in ['Claude 专用', 'ChatGPT 专用']:
+            self.assertEqual((groups[name]['interval'], groups[name]['timeout'], groups[name]['lazy'], groups[name]['max-failed-times']), (600, 5000, True, 3))
 
     def test_ai_bootstrap_precedes_direct_and_ad_rules(self):
         rules = self.template['rules']
@@ -169,7 +172,7 @@ class PolicyTest(unittest.TestCase):
                     if provider in expected:
                         self.assertTrue(all(server.endswith('#' + expected[provider]) for server in servers), key)
                         self.assertTrue(all(not reaches_balance(server.rsplit('#', 1)[-1]) for server in servers), key)
-            self.assertEqual(groups['默认代理']['proxies'], ['故障转移', '负载均衡', '自动选择'])
+            self.assertEqual(groups['默认代理']['proxies'], ['自动选择', '故障转移'])
 
     def test_edgetunnel_ordinary_groups_reuse_strict_ai_pool(self):
         self.current['proxies'] = [
@@ -185,7 +188,7 @@ class PolicyTest(unittest.TestCase):
             self.assertNotIn('dns.google', str(config['dns']['nameserver-policy'][
                 'rule-set:anthropic-bootstrap,anthropic' if name == 'Claude 专用'
                 else 'rule-set:openai-bootstrap,openai']))
-        for name in ['故障转移', '负载均衡', '自动选择']:
+        for name in ['故障转移', '自动选择']:
             self.assertEqual(groups[name]['proxies'], ['192.0.2.1 洛杉矶 · AI', '192.0.2.2 洛杉矶 · AI'])
             self.assertEqual(groups[name]['url'], 'https://cp.cloudflare.com/generate_204')
             self.assertEqual(groups[name]['expected-status'], '204')

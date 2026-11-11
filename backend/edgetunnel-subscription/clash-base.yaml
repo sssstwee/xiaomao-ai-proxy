@@ -3,51 +3,39 @@ proxy-groups:
     icon: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/icons/Proxy.png
     type: select
     proxies:
-      - 故障转移
-      - 负载均衡
       - 自动选择
+      - 故障转移
   - name: 故障转移
     icon: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/icons/Fallback.png
     type: fallback
     url: https://cp.cloudflare.com/generate_204
-    interval: 60
-    lazy: false
-    timeout: 8000
+    interval: 300
+    lazy: true
+    timeout: 5000
     expected-status: "204"
-    max-failed-times: 2
-    include-all-proxies: true
-    exclude-filter: ^普通| · 普通$
-  - name: 负载均衡
-    icon: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/icons/Round_Robin.png
-    type: load-balance
-    strategy: round-robin
-    url: https://cp.cloudflare.com/generate_204
-    interval: 60
-    lazy: false
-    timeout: 8000
-    expected-status: "204"
-    max-failed-times: 2
+    max-failed-times: 3
     include-all-proxies: true
     exclude-filter: ^普通| · 普通$
   - name: 自动选择
     icon: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/icons/Auto.png
     type: url-test
     url: https://cp.cloudflare.com/generate_204
-    interval: 60
-    tolerance: 50
-    lazy: false
-    timeout: 8000
+    interval: 300
+    tolerance: 100
+    lazy: true
+    timeout: 5000
     expected-status: "204"
-    max-failed-times: 2
+    max-failed-times: 3
     include-all-proxies: true
     exclude-filter: ^普通| · 普通$
   - name: Claude 专用
     icon: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/icons/Claude.png
     type: fallback
     url: https://api.anthropic.com/v1/models
-    interval: 90
-    lazy: false
-    timeout: 8000
+    interval: 600
+    lazy: true
+    timeout: 5000
+    max-failed-times: 3
     expected-status: "401/405"
     include-all-proxies: true
     exclude-filter: (?i)warp|^cf-tcp-backup$|^普通| · 普通$
@@ -55,9 +43,10 @@ proxy-groups:
     icon: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/icons/ChatGPT.png
     type: fallback
     url: https://api.openai.com/v1/models
-    interval: 90
-    lazy: false
-    timeout: 8000
+    interval: 600
+    lazy: true
+    timeout: 5000
+    max-failed-times: 3
     expected-status: "401"
     include-all-proxies: true
     exclude-filter: (?i)warp|^cf-tcp-backup$|^普通| · 普通$
@@ -101,6 +90,10 @@ rules:
   - GEOIP,CN,DIRECT
   - MATCH,默认代理
 mode: rule
+tcp-concurrent: true
+keep-alive-interval: 30
+keep-alive-idle: 30
+find-process-mode: 'off'
 ipv6: false
 rule-providers:
   reject:
