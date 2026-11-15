@@ -52,8 +52,7 @@ proxy-groups:
     exclude-filter: (?i)warp|^cf-tcp-backup$|^普通| · 普通$
 rules:
   - AND,((NETWORK,UDP),(DST-PORT,443)),REJECT
-  - AND,((NETWORK,UDP),(RULE-SET,ai-resources)),REJECT
-  - RULE-SET,ai-resources,故障转移,no-resolve
+  - RULE-SET,cn-ai-extra,DIRECT
   - AND,((NETWORK,UDP),(RULE-SET,anthropic-bootstrap)),REJECT
   - RULE-SET,anthropic-bootstrap,Claude 专用,no-resolve
   - AND,((NETWORK,UDP),(RULE-SET,anthropic)),REJECT
@@ -66,6 +65,22 @@ rules:
   - RULE-SET,openai,ChatGPT 专用,no-resolve
   - AND,((NETWORK,UDP),(RULE-SET,openai-voice)),REJECT
   - RULE-SET,openai-voice,ChatGPT 专用,no-resolve
+  - AND,((NETWORK,UDP),(RULE-SET,gemini-bootstrap)),REJECT
+  - RULE-SET,gemini-bootstrap,故障转移,no-resolve
+  - AND,((NETWORK,UDP),(RULE-SET,meta-bootstrap)),REJECT
+  - RULE-SET,meta-bootstrap,故障转移,no-resolve
+  - AND,((NETWORK,UDP),(RULE-SET,gemini)),REJECT
+  - RULE-SET,gemini,故障转移,no-resolve
+  - AND,((NETWORK,UDP),(RULE-SET,ai-shared)),REJECT
+  - RULE-SET,ai-shared,故障转移,no-resolve
+  - AND,((NETWORK,UDP),(RULE-SET,twitter-ai)),REJECT
+  - RULE-SET,twitter-ai,故障转移,no-resolve
+  - AND,((NETWORK,UDP),(RULE-SET,bing-ai)),REJECT
+  - RULE-SET,bing-ai,故障转移,no-resolve
+  - AND,((NETWORK,UDP),(RULE-SET,google)),REJECT
+  - RULE-SET,google,故障转移,no-resolve
+  - AND,((NETWORK,UDP),(RULE-SET,ai-resources)),REJECT
+  - RULE-SET,ai-resources,故障转移,no-resolve
   - AND,((NETWORK,UDP),(RULE-SET,artifact-resources)),REJECT
   - RULE-SET,artifact-resources,故障转移,no-resolve
   - RULE-SET,private,DIRECT
@@ -74,13 +89,13 @@ rules:
   - RULE-SET,line-ip,默认代理,no-resolve
   - RULE-SET,applications,DIRECT
   - RULE-SET,ai-cn,DIRECT
+  - AND,((NETWORK,UDP),(RULE-SET,ai)),REJECT
   - RULE-SET,ai,故障转移
   - RULE-SET,reject,REJECT
   - RULE-SET,tld-not-cn,默认代理
   - RULE-SET,gfw,默认代理
   - RULE-SET,telegramcidr,默认代理,no-resolve
   - RULE-SET,proxy,默认代理
-  - RULE-SET,google,默认代理
   - RULE-SET,icloud,DIRECT
   - RULE-SET,apple,DIRECT
   - AND,((NETWORK,TCP),(DOMAIN,perfops2.byte-test.com)),默认代理
@@ -786,6 +801,345 @@ rule-providers:
       - cdn.tailwindcss.com
       - code.jquery.com
       - unpkg.com
+  cn-ai-extra:
+    type: inline
+    behavior: domain
+    payload:
+      - +.deepseek.com
+      - +.deepseek.cn
+      - +.deepseeksvc.com
+      - +.kimi.com
+      - +.kimi.ai
+      - +.moonshot.cn
+      - +.moonshot.ai
+      - +.doubao.com
+      - +.doubaoapps.com
+      - +.doubaocdn.com
+      - +.doubao-dev.com
+      - +.qwen.ai
+      - +.qianwen.com
+      - +.qianwenai.com
+      - +.tongyi.com
+      - +.tongyi.aliyun.com
+      - +.bigmodel.cn
+      - +.chatglm.cn
+      - +.zhipuai.cn
+      - +.z.ai
+  gemini-bootstrap:
+    type: inline
+    behavior: domain
+    payload:
+      - ai.google.dev
+      - alkalicore-pa.clients6.google.com
+      - alkalimakersuite-pa.clients6.google.com
+      - webchannel-alkalimakersuite-pa.clients6.google.com
+      - geminiweb-pa.clients.google.com
+      - geminiweb-pa.clients6.google.com
+      - appsgenaiserver-pa.clients.google.com
+      - appsgenaiserver-pa.clients6.google.com
+      - appsgenaiserver-pa.googleapis.com
+      - cloudaicompanion.googleapis.com
+      - cloudcode-pa.googleapis.com
+      - daily-cloudcode-pa.googleapis.com
+      - notebooklm-pa.googleapis.com
+      - notebooklm.googleapis.com
+      - antigravity-pa.googleapis.com
+      - antigravity.googleapis.com
+      - +.notebook.google
+      - +.deepmind.google
+      - +.antigravity-unleash.goog
+      - +.antigravity.google
+      - +.opal.google
+      - +.flow.google
+      - +.generativeai.google
+      - +.labs.google
+      - +.ai.studio
+      - +.jules.google
+      - +.notebooklm.google
+      - +.gemini.google
+      - +.deepmind.com
+      - +.notebook.google.com
+      - +.labs.google.com
+      - +.gemini.gstatic.com
+      - +.gemini.google.com
+      - +.bard.google.com
+      - +.notebooklm.google.com
+      - +.aistudio.google.com
+      - +.jules.google.com
+      - +.makersuite.google.com
+      - +.stitch.withgoogle.com
+      - +.robinfrontend-pa.googleapis.com
+      - +.flow.google.com
+      - +.aisandbox-pa.googleapis.com
+      - +.aicode.googleapis.com
+      - +.aida.googleapis.com
+      - +.proactivebackend-pa.googleapis.com
+      - +.opal.google.com
+      - +.generativelanguage.googleapis.com
+      - +.geller-pa.googleapis.com
+      - +.labstailwind.pa.googleapis.com
+      - accounts.google.com
+      - accounts.google.cn
+      - accounts.gstatic.com
+      - oauth2.googleapis.com
+      - oauthaccountmanager.googleapis.com
+      - ssl.gstatic.com
+      - lh3.googleusercontent.com
+  meta-bootstrap:
+    type: inline
+    behavior: domain
+    payload:
+      - +.meta.ai
+      - +.muse.ai
+      - +.metaaivm.com
+      - +.metaaiusercontent.com
+      - +.meta.com
+      - +.fbcdn.net
+      - +.facebook.net
+      - graph.facebook.com
+      - gateway.facebook.com
+      - www.facebook.com
+      - +.facebook.com
+      - +.instagram.com
+      - +.cdninstagram.com
+      - +.fbsbx.com
+      - +.messenger.com
+      - +.threads.net
+  ai-shared:
+    type: inline
+    behavior: domain
+    payload:
+      - +.datadoghq.com
+      - cdn.growthbook.io
+      - +.sentry.io
+      - +.statsig.com
+      - +.featuregates.org
+      - +.featureassets.org
+      - +.prodregistryv2.org
+      - bun.report
+      - +.hcaptcha.com
+      - challenges.cloudflare.com
+      - +.recaptcha.net
+      - accounts.google.com
+      - oauth2.googleapis.com
+      - js.stripe.com
+      - api.stripe.com
+      - checkout.stripe.com
+      - billing.stripe.com
+      - +.stripe.network
+      - +.stripecdn.com
+      - +.intercom.io
+      - +.intercomcdn.com
+      - +.segment.io
+      - cdn.segment.com
+      - cdn.usefathom.com
+      - +.workos.com
+      - login.microsoftonline.com
+      - storage.googleapis.com
+      - registry.npmjs.org
+      - github.com
+      - api.github.com
+      - codeload.github.com
+      - raw.githubusercontent.com
+      - objects.githubusercontent.com
+      - release-assets.githubusercontent.com
+      - formulae.brew.sh
+      - bun.sh
+      - +.googlesource.com
+      - fonts.googleapis.com
+      - fonts.gstatic.com
+      - cdnjs.cloudflare.com
+      - cdn.jsdelivr.net
+      - cdn.tailwindcss.com
+      - code.jquery.com
+      - unpkg.com
+      - esm.sh
+      - cdn.plot.ly
+      - chromewebstore.google.com
+      - clients2.google.com
+      - clients2.googleusercontent.com
+      - update.googleapis.com
+      - +.api.aws
+      - bedrock-runtime.us-east-1.amazonaws.com
+      - bedrock-runtime.us-west-2.amazonaws.com
+      - sts.amazonaws.com
+      - claude.googleapis.com
+      - aiplatform.googleapis.com
+      - us-east5-aiplatform.googleapis.com
+      - +.services.ai.azure.com
+      - mcp.asana.com
+      - mcp.atlassian.com
+      - mcp.notion.com
+      - mcp.linear.app
+      - mcp.slack.com
+      - mcp.figma.com
+      - mcp.box.com
+      - mcp.intercom.com
+      - mcp.sentry.dev
+      - mcp.amplitude.com
+      - drivemcp.googleapis.com
+      - gmailmcp.googleapis.com
+      - +.googleapis.com
+      - +.clients6.google.com
+      - +.clients.google.com
+      - accounts.youtube.com
+      - +.googleusercontent.com
+      - +.gstatic.com
+      - +.google.dev
+      - +.withgoogle.com
+      - +.google-analytics.com
+      - +.googleanalytics.com
+      - +.googletagmanager.com
+      - +.doubleclick.net
+      - +.github.com
+      - +.githubusercontent.com
+      - +.githubassets.com
+      - +.npmjs.org
+      - +.npmjs.com
+      - +.claude.fedstart.com
+      - +.claude-staging.fedstart.com
+      - +.chatgpt-staging.com
+      - +.microsoftonline.com
+      - +.microsoftonline-p.com
+      - +.msauth.net
+      - +.msauthimages.net
+      - +.live.com
+      - +.azureedge.net
+      - +.azurefd.net
+      - +.blob.core.windows.net
+      - +.openai.azure.com
+      - +.cognitiveservices.azure.com
+      - +.azure-api.net
+      - +.cloudfront.net
+      - +.amazonaws.com
+      - +.statsigcdn.com
+      - +.statsigapi.net
+      - +.assetsconfigcdn.org
+      - +.beyondwickedmapping.org
+      - cloudflare-dns.com
+      - +.workoscdn.com
+      - +.authkit.app
+      - +.deepl.com
+      - +.deepl.net
+      - +.laratranslate.com
+      - +.modernmt.com
+      - +.translate.yandex.net
+      - translate.yandex.com
+      - translate.yandex.ru
+      - translate.api.cloud.yandex.net
+      - ai.api.cloud.yandex.net
+      - assistant.api.cloud.yandex.net
+      - transcribe.api.cloud.yandex.net
+      - tts.api.cloud.yandex.net
+      - stt.api.cloud.yandex.net
+      - vision.api.cloud.yandex.net
+      - ocr.api.cloud.yandex.net
+      - +.yastatic.net
+      - +.arkoselabs.com
+      - +.funcaptcha.com
+      - +.nel.cloudflare.com
+      - +.cloudflareinsights.com
+      - +.anthropic.com
+      - +.claude.ai
+      - api.msn.com
+      - api.statsig.com
+      - assets.msn.com
+      - browser-intake-datadoghq.com
+      - chat.openai.com.cdn.cloudflare.net
+      - copilot.microsoft.com
+      - gateway.bingviz.microsoft.net
+      - gateway.bingviz.microsoftapp.net
+      - in.appcenter.ms
+      - location.microsoft.com
+      - odc.officeapps.live.com
+      - openai-api.arkoselabs.com
+      - openaicomproductionae4b.blob.core.windows.net
+      - production-openaicom-storage.azureedge.net
+      - r.bing.com
+      - self.events.data.microsoft.com
+      - services.bingapis.com
+      - static.cloudflareinsights.com
+      - sydney.bing.com
+      - www.bing.com
+      - +.algolia.net
+      - +.api.microsoftapp.net
+      - +.auth0.com
+      - +.bing-shopping.microsoft-falcon.io
+      - +.challenges.cloudflare.com
+      - +.chatgpt.com
+      - +.chatgpt.livekit.cloud
+      - +.client-api.arkoselabs.com
+      - +.edgeservices.bing.com
+      - +.events.statsigapi.net
+      - +.host.livekit.cloud
+      - +.identrust.com
+      - +.launchdarkly.com
+      - +.oaistatic.com
+      - +.oaiusercontent.com
+      - +.observeit.net
+      - +.openai.com
+      - +.openaiapi-site.azureedge.net
+      - +.openaicom.imgix.net
+      - +.stripe.com
+      - +.turn.livekit.cloud
+      - +.segment.com
+      - +.character.ai
+      - +.hailuoai.video
+      - +.replicate.com
+      - +.replicate.delivery
+      - +.runwayml.com
+      - +.ideogram.ai
+      - +.v0.dev
+      - +.v0.app
+      - +.bolt.new
+      - +.lovable.dev
+      - +.lovable.app
+      - +.genspark.ai
+      - +.phind.com
+      - +.together.ai
+      - +.together.xyz
+      - +.fireworks.ai
+      - +.deepinfra.com
+      - +.suno.com
+      - +.suno.ai
+      - +.udio.com
+      - +.lmarena.ai
+      - +.you.com
+      - +.krea.ai
+      - +.leonardo.ai
+      - +.pika.art
+      - +.lumalabs.ai
+      - +.heygen.com
+      - +.stability.ai
+      - +.fal.ai
+      - +.fal.run
+      - +.fal.media
+      - +.civitai.com
+      - +.openart.ai
+  gemini:
+    type: http
+    behavior: domain
+    format: yaml
+    url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/gemini.yaml
+    path: ./ruleset/edgetunnel-gemini.yaml
+    interval: 86400
+    proxy: 默认代理
+  twitter-ai:
+    type: http
+    behavior: domain
+    format: yaml
+    url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/twitter.yaml
+    path: ./ruleset/edgetunnel-twitter-ai.yaml
+    interval: 86400
+    proxy: 默认代理
+  bing-ai:
+    type: http
+    behavior: domain
+    format: yaml
+    url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/bing.yaml
+    path: ./ruleset/edgetunnel-bing-ai.yaml
+    interval: 86400
+    proxy: 默认代理
 dns:
   enable: true
   ipv6: false
@@ -803,13 +1157,36 @@ dns:
   direct-nameserver-follow-policy: false
   respect-rules: true
   nameserver-policy:
-    rule-set:ai-resources,artifact-resources:
+    rule-set:cn-ai-extra:
+      - https://dns.alidns.com/dns-query
+      - https://doh.pub/dns-query
+    +.claude.ai:
+      - https://cloudflare-dns.com/dns-query#Claude 专用
+    +.anthropic.com:
+      - https://cloudflare-dns.com/dns-query#Claude 专用
+    +.openai.com:
+      - https://cloudflare-dns.com/dns-query#ChatGPT 专用
+    +.chatgpt.com:
+      - https://cloudflare-dns.com/dns-query#ChatGPT 专用
+    +.gemini.google.com:
+      - https://cloudflare-dns.com/dns-query#故障转移
+      - https://dns.google/dns-query#故障转移
+    +.muse.ai:
+      - https://cloudflare-dns.com/dns-query#故障转移
+      - https://dns.google/dns-query#故障转移
+    +.metaaivm.com:
       - https://cloudflare-dns.com/dns-query#故障转移
       - https://dns.google/dns-query#故障转移
     rule-set:anthropic-bootstrap,anthropic:
       - https://cloudflare-dns.com/dns-query#Claude 专用
     rule-set:openai-bootstrap,openai:
       - https://cloudflare-dns.com/dns-query#ChatGPT 专用
+    rule-set:gemini-bootstrap,gemini,meta-bootstrap,ai-shared,twitter-ai,bing-ai,google:
+      - https://cloudflare-dns.com/dns-query#故障转移
+      - https://dns.google/dns-query#故障转移
+    rule-set:ai-resources,artifact-resources:
+      - https://cloudflare-dns.com/dns-query#故障转移
+      - https://dns.google/dns-query#故障转移
     rule-set:line:
       - https://cloudflare-dns.com/dns-query#默认代理
       - https://dns.google/dns-query#默认代理
