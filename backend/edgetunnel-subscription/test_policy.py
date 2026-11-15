@@ -91,7 +91,7 @@ class PolicyTest(unittest.TestCase):
         ])
         self.assertEqual(config['rules'][1:], self.template['rules'])
         rules = config['sub-rules']['voyra-quic']
-        self.assertIn('RULE-SET,google,Voyra QUIC', rules)
+        self.assertIn('RULE-SET,google,REJECT,no-resolve', rules)
         self.assertIn('RULE-SET,cncidr,REJECT,no-resolve', rules)
         self.assertIn('RULE-SET,anthropic-bootstrap,REJECT,no-resolve', rules)
         self.assertIn('RULE-SET,openai-bootstrap,REJECT,no-resolve', rules)
@@ -141,6 +141,13 @@ class PolicyTest(unittest.TestCase):
             'ai': '故障转移',
             'artifact-resources': '故障转移',
             'ai-resources': '故障转移',
+            'gemini-bootstrap': '故障转移',
+            'meta-bootstrap': '故障转移',
+            'ai-shared': '故障转移',
+            'gemini': '故障转移',
+            'twitter-ai': '故障转移',
+            'bing-ai': '故障转移',
+            'google': '故障转移',
         }
         for config in [self.template, SYNC.render(self.current, self.template, ['voyra-hy2-direct'])]:
             groups = {group['name']: group for group in config['proxy-groups']}
@@ -193,8 +200,8 @@ class PolicyTest(unittest.TestCase):
             self.assertEqual(groups[name]['url'], 'https://cp.cloudflare.com/generate_204')
             self.assertEqual(groups[name]['expected-status'], '204')
         rules = config['rules']
-        self.assertLess(rules.index('RULE-SET,ai-resources,故障转移,no-resolve'),
-                        rules.index('RULE-SET,anthropic-bootstrap,Claude 专用,no-resolve'))
+        self.assertLess(rules.index('RULE-SET,anthropic-bootstrap,Claude 专用,no-resolve'),
+                        rules.index('RULE-SET,ai-resources,故障转移,no-resolve'))
         self.assertIn('openaiassets.blob.core.windows.net',
                       config['rule-providers']['ai-resources']['payload'])
         self.current['proxies'] = self.current['proxies'][1::2]
@@ -207,11 +214,28 @@ class PolicyTest(unittest.TestCase):
         self.assertIn(b'proxies:\n  - ', content)
         self.assertEqual(yaml.safe_load(content), config)
 
+    def test_pinned_ai_dependencies_precede_broad_domestic_rules_in_routing_and_dns(self):
+        rules = self.template['rules']
+        policy_keys = list(self.template['dns']['nameserver-policy'])
+        domestic_route = rules.index('RULE-SET,ai-cn,DIRECT')
+        domestic_dns = policy_keys.index('rule-set:ai-cn,direct,icloud,apple')
+        self.assertLess(rules.index('RULE-SET,cn-ai-extra,DIRECT'),
+                        rules.index('RULE-SET,anthropic-bootstrap,Claude 专用,no-resolve'))
+        for provider in ['gemini-bootstrap', 'meta-bootstrap', 'ai-shared', 'gemini',
+                         'twitter-ai', 'bing-ai', 'google']:
+            route = rules.index(f'RULE-SET,{provider},故障转移,no-resolve')
+            self.assertLess(route, domestic_route, provider)
+            self.assertLess(route, rules.index('RULE-SET,applications,DIRECT'), provider)
+            self.assertEqual(rules[route - 1], f'AND,((NETWORK,UDP),(RULE-SET,{provider})),REJECT')
+            dns_key = next(key for key in policy_keys if key.startswith('rule-set:')
+                           and provider in key.removeprefix('rule-set:').split(','))
+            self.assertLess(policy_keys.index(dns_key), domestic_dns, provider)
+
     def test_static_dependencies_use_own_repositories_and_survive_rendering(self):
         raw = 'https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/'
         providers = self.template['rule-providers'].values()
         remote = [provider for provider in providers if provider['type'] == 'http']
-        self.assertEqual(len(remote), 19)
+        self.assertEqual(len(remote), 22)
         for provider in remote:
             self.assertTrue(provider['url'].startswith(raw + 'rules/'))
         for group in self.template['proxy-groups']:
