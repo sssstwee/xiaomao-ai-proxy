@@ -71,6 +71,7 @@ class PolicyTest(unittest.TestCase):
         self.assertEqual([rule for rule in rules if ',DIRECT' in rule], [
             'RULE-SET,cn-ai-extra,DIRECT', 'RULE-SET,private,DIRECT', 'RULE-SET,lancidr,DIRECT,no-resolve',
             'RULE-SET,ai-cn,DIRECT', 'RULE-SET,direct,DIRECT', 'GEOSITE,cn,DIRECT',
+            'RULE-SET,cncidr,DIRECT,no-resolve',
         ])
         self.assertEqual(rules[-2:], ['MATCH,默认代理', 'NETWORK,UDP,REJECT'])
         self.assertEqual(rules[0], 'AND,((NETWORK,UDP),(DST-PORT,443)),REJECT')
@@ -111,7 +112,7 @@ class PolicyTest(unittest.TestCase):
     def test_ai_quic_pins_verified_dedicated_node_before_reject(self):
         config = SYNC.render(self.current, self.template, ['voyra-hy2-direct'])
         rules = config['sub-rules']['voyra-quic']
-        ai_providers = ['anthropic-bootstrap', 'anthropic', 'anthropic-ip', 'openai-bootstrap', 'openai', 'openai-voice']
+        ai_providers = ['anthropic-bootstrap', 'anthropic', 'anthropic-ip', 'claude-deps', 'openai-bootstrap', 'openai', 'openai-voice']
         for provider in ai_providers:
             allowed = f'RULE-SET,{provider},voyra-hy2-direct,no-resolve'
             rejected = f'RULE-SET,{provider},REJECT,no-resolve'
@@ -142,6 +143,7 @@ class PolicyTest(unittest.TestCase):
             'anthropic-bootstrap': 'Claude 专用',
             'anthropic': 'Claude 专用',
             'anthropic-ip': 'Claude 专用',
+            'claude-deps': 'Claude 专用',
             'openai-bootstrap': 'ChatGPT 专用',
             'openai': 'ChatGPT 专用',
             'openai-voice': 'ChatGPT 专用',
@@ -241,7 +243,7 @@ class PolicyTest(unittest.TestCase):
         raw = 'https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/'
         providers = self.template['rule-providers'].values()
         remote = [provider for provider in providers if provider['type'] == 'http']
-        self.assertEqual(len(remote), 18)
+        self.assertEqual(len(remote), 19)
         for provider in remote:
             self.assertTrue(provider['url'].startswith(raw + 'rules/'))
         for group in self.template['proxy-groups']:
@@ -253,6 +255,39 @@ class PolicyTest(unittest.TestCase):
             self.assertTrue(url.startswith('https://github.com/sssstwee/edgetunnel/releases/latest/download/'))
         for key in ['geox-url', 'geodata-mode', 'geo-auto-update', 'geo-update-interval']:
             self.assertEqual(config[key], self.template[key])
+
+    def test_claude_dependencies_share_the_claude_group_ahead_of_shared_bootstraps(self):
+        rules = self.template['rules']
+        route = rules.index('RULE-SET,claude-deps,Claude 专用,no-resolve')
+        self.assertEqual(rules[route - 1], 'AND,((NETWORK,UDP),(RULE-SET,claude-deps)),REJECT')
+        self.assertEqual(rules[route - 2], 'RULE-SET,anthropic-ip,Claude 专用,no-resolve')
+        self.assertLess(route, rules.index('RULE-SET,openai-bootstrap,ChatGPT 专用,no-resolve'))
+        payload = self.template['rule-providers']['claude-deps']['payload']
+        self.assertEqual(len(set(payload)), len(payload))
+        for host in ['+.datadoghq.com', 'cdn.growthbook.io', 'o1158394.ingest.us.sentry.io', '+.statsig.com',
+                     '+.hcaptcha.com', 'challenges.cloudflare.com', 'js.stripe.com', '+.intercom.io',
+                     '+.segment.io', 'storage.googleapis.com', 'registry.npmjs.org', 'mcp.notion.com']:
+            self.assertIn(host, payload)
+        # Hosts other assistants sign in through stay on their own groups.
+        for host in ['+.sentry.io', '+.workos.com', 'accounts.google.com', 'oauth2.googleapis.com', 'login.microsoftonline.com']:
+            self.assertNotIn(host, payload)
+        domestic = set(self.template['rule-providers']['cn-ai-extra']['payload'])
+        self.assertFalse(domestic & set(payload))
+        keys = list(self.template['dns']['nameserver-policy'])
+        self.assertLess(keys.index('rule-set:claude-deps'), keys.index('rule-set:openai-bootstrap,openai'))
+        self.assertTrue(all(server.endswith('#Claude 专用') for server in self.template['dns']['nameserver-policy']['rule-set:claude-deps']))
+
+    def test_domestic_addresses_without_a_domain_stay_direct_after_every_proxy_rule(self):
+        rules = self.template['rules']
+        route = rules.index('RULE-SET,cncidr,DIRECT,no-resolve')
+        self.assertEqual(rules[route - 1], 'GEOSITE,cn,DIRECT')
+        self.assertEqual(rules[route + 1:], ['MATCH,默认代理', 'NETWORK,UDP,REJECT'])
+        provider = self.template['rule-providers']['cncidr']
+        self.assertEqual((provider['type'], provider['behavior']), ('http', 'ipcidr'))
+        sniffer = self.template['sniffer']
+        self.assertTrue(sniffer['enable'] and sniffer['parse-pure-ip'])
+        self.assertFalse(sniffer['override-destination'])
+        self.assertEqual(set(sniffer['sniff']), {'HTTP', 'TLS', 'QUIC'})
 
 
 if __name__ == '__main__':
