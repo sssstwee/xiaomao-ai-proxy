@@ -10,7 +10,9 @@ Claude、OpenAI 的核心域名与 DNS 分别进入各自的独立 fallback，�
 
 2026-11-15 参考 JMS 的 11 月 14 日 AI 覆盖补充：内联 Gemini、Meta 引导域名，以及 Claude 第三方依赖和海外 AI 补充清单的去重并集（207 条）。包含 DeepL / Lara / Yandex、character.ai、Replicate、Runway、v0、Bolt、Lovable、Suno、Together、Fireworks、DeepInfra、LMArena 等。共享依赖按域名进入“故障转移”，不将 JMS 的美国节点编号或客户端进程策略复制到模板。Google 共享域、Gemini、Twitter 与 Bing 均使用与 JMS 相同的成熟 MetaCubeX 清单，镜像到资源仓库并每日更新。国内 AI 显式例外在最前；固定 AI 主站与依赖先于宽泛国内 AI、应用、广告和国内地址规则，DNS 采用相同优先级。
 
-国内 AI、原有 Loyalsoldier 和 `GEOSITE,cn` 国内域名、局域网域名和私有网段走直连。其余流量按专用规则或 `默认代理` 转发，包括仅有中国公网 IP 的连接。
+国内 AI、原有 Loyalsoldier 和 `GEOSITE,cn` 国内域名、局域网域名和私有网段走直连。没有可识别域名、目标属于中国大陆网段（`cncidr`，`no-resolve`）的纯 IP 连接也直连，规则位于全部 AI 与代理规则之后、`MATCH` 之前；域名流量不在本地解析。其余流量按专用规则或 `默认代理` 转发。模板启用 HTTP / TLS / QUIC 嗅探（`parse-pure-ip`，不改写目的地址），自带 DoH 或直连 IP 的应用也按真实域名分流；Voyra 同步不写入 `sniffer`，保留其现有设置。
+
+2026-11-18 起，Claude、Claude Code 与 Claude Desktop 的第三方依赖（Datadog / GrowthBook / Claude 的 Sentry 项目 / Statsig 遥测，hCaptcha / Turnstile / reCAPTCHA，Stripe、Intercom、Segment，安装更新与插件、Artifacts 资源、Bedrock / Vertex / Foundry、内置 MCP 连接器、文档站资源）在 `claude-deps` 中，紧随 Anthropic IP、先于 OpenAI 共享引导，路由与 DNS 均使用 `Claude 专用`，使登录、验证码、计费和遥测与 claude.ai 同一出口。共享主机按域名整体生效，ChatGPT 访问 Stripe、Intercom、Segment、Statsig、Turnstile 时同样使用 `Claude 专用`。WorkOS、Google 与 Microsoft 账号主机及 OpenAI 自己的 Sentry 项目不在该集合，仍按原规则。
 
 Claude 和 ChatGPT 的核心域名通过各自的代理组查询 Cloudflare DoH。普通海外流量和公共依赖使用各自代理组中的 Cloudflare 或 Google DoH。国内域名使用国内 DoH，局域网域名沿用系统 DNS。`proxy-server-nameserver` 负责解析节点域名。模板启用 IPv6 TUN，DNS 保留原 IPv4 解析设置。EdgeTunnel 拦截 UDP/443，使支持回落的客户端改走 TCP。默认代理无法承载的其他 UDP 请求也会被拦截。
 
@@ -41,6 +43,6 @@ python3 -m unittest discover -s backend/edgetunnel-subscription -p 'test_*.py' -
 
 ## 公共资源归档
 
-18 个远程规则集、6 个共享图标、Voyra QUIC 图标和 Voice JSON 全部引用 [sssstwee/edgetunnel/resources](https://github.com/sssstwee/edgetunnel/tree/main/resources)。GeoIP / GeoSite / MetaDB / ASN 四个大数据文件引用该仓库 Releases，并在 `geox-url` 中显式指定；保持 MMDB 模式，每 24 小时更新，避免内核回到默认第三方下载地址。转换层和 Voyra 同步均保留这些字段。10 个 inline 规则集继续保存在本模板。
+19 个远程规则集、6 个共享图标、Voyra QUIC 图标和 Voice JSON 全部引用 [sssstwee/edgetunnel/resources](https://github.com/sssstwee/edgetunnel/tree/main/resources)。GeoIP / GeoSite / MetaDB / ASN 四个大数据文件引用该仓库 Releases，并在 `geox-url` 中显式指定；保持 MMDB 模式，每 24 小时更新，避免内核回到默认第三方下载地址。转换层和 Voyra 同步均保留这些字段。11 个 inline 规则集继续保存在本模板。
 
 资源仓库每天同步已使用的成熟上游数据，保留来源提交、SHA256、许可证及最后可用快照；更新失败不会清空现有资源。规则和图标使用固定的自有 main 地址，Geo 数据使用自有 `releases/latest/download` 地址。业务规则在此处维护，资源来源在资源仓库的 `sources.json` 维护；不要将鉴权和节点凭据复制到公共文件。

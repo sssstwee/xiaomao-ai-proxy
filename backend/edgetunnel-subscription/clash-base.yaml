@@ -59,6 +59,8 @@ rules:
   - RULE-SET,anthropic,Claude 专用,no-resolve
   - AND,((NETWORK,UDP),(RULE-SET,anthropic-ip)),REJECT
   - RULE-SET,anthropic-ip,Claude 专用,no-resolve
+  - AND,((NETWORK,UDP),(RULE-SET,claude-deps)),REJECT
+  - RULE-SET,claude-deps,Claude 专用,no-resolve
   - AND,((NETWORK,UDP),(RULE-SET,openai-bootstrap)),REJECT
   - RULE-SET,openai-bootstrap,ChatGPT 专用,no-resolve
   - AND,((NETWORK,UDP),(RULE-SET,openai)),REJECT
@@ -98,6 +100,7 @@ rules:
   - AND,((NETWORK,TCP),(DOMAIN,perfops2.byte-test.com)),默认代理
   - RULE-SET,direct,DIRECT
   - GEOSITE,cn,DIRECT
+  - RULE-SET,cncidr,DIRECT,no-resolve
   - MATCH,默认代理
   - NETWORK,UDP,REJECT
 mode: rule
@@ -106,6 +109,18 @@ keep-alive-interval: 30
 keep-alive-idle: 30
 find-process-mode: 'off'
 ipv6: true
+sniffer:
+  enable: true
+  force-dns-mapping: true
+  parse-pure-ip: true
+  override-destination: false
+  sniff:
+    HTTP:
+      ports: [80, 8080-8880]
+    TLS:
+      ports: [443, 8443]
+    QUIC:
+      ports: [443, 8443]
 tun:
   enable: true
   stack: mixed
@@ -169,6 +184,14 @@ rule-providers:
     format: yaml
     url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/tld-not-cn.yaml
     path: ./ruleset/edgetunnel-tld-not-cn.yaml
+    interval: 86400
+    proxy: 默认代理
+  cncidr:
+    type: http
+    behavior: ipcidr
+    format: yaml
+    url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/cncidr.yaml
+    path: ./ruleset/edgetunnel-cncidr.yaml
     interval: 86400
     proxy: 默认代理
   telegramcidr:
@@ -262,6 +285,88 @@ rule-providers:
       - anthropic.auth0.com
       - browser-intake-us5-datadoghq.com
       - http-intake.logs.us5.datadoghq.com
+  # Third-party hosts Claude, Claude Code and Claude Desktop depend on (telemetry, captcha, billing,
+  # support, install/update, Artifacts, cloud providers and bundled MCP connectors). Pinned ahead of
+  # OpenAI's shared bootstrap so Claude sign-in and telemetry leave from the same group as claude.ai.
+  # WorkOS, Google and Microsoft account hosts stay with ChatGPT / Gemini / Copilot.
+  claude-deps:
+    type: inline
+    behavior: domain
+    payload:
+      - +.datadoghq.com
+      - cdn.growthbook.io
+      - o1158394.ingest.us.sentry.io
+      - o1158394.ingest.sentry.io
+      - +.statsig.com
+      - +.featuregates.org
+      - +.featureassets.org
+      - +.prodregistryv2.org
+      - bun.report
+      - +.hcaptcha.com
+      - challenges.cloudflare.com
+      - +.recaptcha.net
+      - js.stripe.com
+      - api.stripe.com
+      - checkout.stripe.com
+      - billing.stripe.com
+      - +.stripe.network
+      - +.stripecdn.com
+      - +.intercom.io
+      - +.intercomcdn.com
+      - +.intercomassets.com
+      - +.intercom.help
+      - +.segment.io
+      - cdn.segment.com
+      - cdn.usefathom.com
+      - +.mintcdn.com
+      - mintlify.b-cdn.net
+      - +.mintlify.site
+      - storage.googleapis.com
+      - registry.npmjs.org
+      - github.com
+      - api.github.com
+      - codeload.github.com
+      - raw.githubusercontent.com
+      - objects.githubusercontent.com
+      - release-assets.githubusercontent.com
+      - formulae.brew.sh
+      - bun.sh
+      - +.googlesource.com
+      - fonts.googleapis.com
+      - fonts.gstatic.com
+      - cdnjs.cloudflare.com
+      - cdn.jsdelivr.net
+      - cdn.tailwindcss.com
+      - code.jquery.com
+      - unpkg.com
+      - esm.sh
+      - cdn.plot.ly
+      - chromewebstore.google.com
+      - clients2.google.com
+      - clients2.googleusercontent.com
+      - update.googleapis.com
+      - +.api.aws
+      - bedrock-runtime.us-east-1.amazonaws.com
+      - bedrock-runtime.us-west-2.amazonaws.com
+      - sts.amazonaws.com
+      - claude.googleapis.com
+      - aiplatform.googleapis.com
+      - us-east5-aiplatform.googleapis.com
+      - aiplatform.us.rep.googleapis.com
+      - aiplatform.eu.rep.googleapis.com
+      - +.services.ai.azure.com
+      - mcp.asana.com
+      - mcp.atlassian.com
+      - mcp.notion.com
+      - mcp.linear.app
+      - mcp.slack.com
+      - mcp.figma.com
+      - mcp.box.com
+      - mcp.intercom.com
+      - mcp.sentry.dev
+      - mcp.amplitude.com
+      - drivemcp.googleapis.com
+      - gmailmcp.googleapis.com
   anthropic-ip:
     type: inline
     behavior: ipcidr
@@ -1150,6 +1255,8 @@ dns:
       - https://cloudflare-dns.com/dns-query#故障转移
       - https://dns.google/dns-query#故障转移
     rule-set:anthropic-bootstrap,anthropic:
+      - https://cloudflare-dns.com/dns-query#Claude 专用
+    rule-set:claude-deps:
       - https://cloudflare-dns.com/dns-query#Claude 专用
     rule-set:openai-bootstrap,openai:
       - https://cloudflare-dns.com/dns-query#ChatGPT 专用
