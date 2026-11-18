@@ -61,13 +61,18 @@ class PolicyTest(unittest.TestCase):
         for name in ['Claude 专用', 'ChatGPT 专用']:
             self.assertEqual((groups[name]['interval'], groups[name]['timeout'], groups[name]['lazy'], groups[name]['max-failed-times']), (600, 5000, True, 3))
 
-    def test_ai_bootstrap_precedes_direct_and_ad_rules(self):
+    def test_ai_bootstrap_precedes_general_proxy_and_domestic_rules(self):
         rules = self.template['rules']
         claude = 'RULE-SET,anthropic-bootstrap,Claude 专用,no-resolve'
         chatgpt = 'RULE-SET,openai-bootstrap,ChatGPT 专用,no-resolve'
         self.assertLess(rules.index(claude), rules.index(chatgpt))
-        self.assertLess(rules.index(chatgpt), rules.index('RULE-SET,reject,REJECT'))
-        self.assertLess(rules.index(chatgpt), rules.index('RULE-SET,applications,DIRECT'))
+        self.assertLess(rules.index(chatgpt), rules.index('RULE-SET,reject,默认代理'))
+        self.assertLess(rules.index(chatgpt), rules.index('GEOSITE,cn,DIRECT'))
+        self.assertEqual([rule for rule in rules if ',DIRECT' in rule], [
+            'RULE-SET,cn-ai-extra,DIRECT', 'RULE-SET,private,DIRECT', 'RULE-SET,lancidr,DIRECT,no-resolve',
+            'RULE-SET,ai-cn,DIRECT', 'GEOSITE,cn,DIRECT',
+        ])
+        self.assertEqual(rules[-2:], ['MATCH,默认代理', 'NETWORK,UDP,REJECT'])
         self.assertEqual(rules[0], 'AND,((NETWORK,UDP),(DST-PORT,443)),REJECT')
         providers = self.template['rule-providers']
         self.assertIn('anthropic.auth0.com', providers['anthropic-bootstrap']['payload'])
@@ -92,7 +97,9 @@ class PolicyTest(unittest.TestCase):
         self.assertEqual(config['rules'][1:], self.template['rules'])
         rules = config['sub-rules']['voyra-quic']
         self.assertIn('RULE-SET,google,REJECT,no-resolve', rules)
-        self.assertIn('RULE-SET,cncidr,REJECT,no-resolve', rules)
+        self.assertIn('RULE-SET,lancidr,REJECT,no-resolve', rules)
+        self.assertIn('GEOSITE,cn,REJECT', rules)
+        self.assertEqual(rules[-2:], ['MATCH,Voyra QUIC', 'NETWORK,UDP,REJECT'])
         self.assertIn('RULE-SET,anthropic-bootstrap,REJECT,no-resolve', rules)
         self.assertIn('RULE-SET,openai-bootstrap,REJECT,no-resolve', rules)
         self.assertTrue(all(',DIRECT' not in rule for rule in rules))
@@ -111,7 +118,7 @@ class PolicyTest(unittest.TestCase):
             position = rules.index(allowed)
             self.assertEqual(rules[position + 1], rejected)
             self.assertNotIn(f'AND,((NETWORK,UDP),(RULE-SET,{provider})),REJECT', rules[:position])
-            self.assertLess(position, rules.index('RULE-SET,applications,REJECT'))
+            self.assertLess(position, rules.index('GEOSITE,cn,REJECT'))
         baseline = SYNC.render(self.current, self.template)
         self.assertEqual(config['rules'][1:], baseline['rules'])
         self.assertEqual(config['proxy-groups'][:-1], baseline['proxy-groups'])
@@ -218,14 +225,13 @@ class PolicyTest(unittest.TestCase):
         rules = self.template['rules']
         policy_keys = list(self.template['dns']['nameserver-policy'])
         domestic_route = rules.index('RULE-SET,ai-cn,DIRECT')
-        domestic_dns = policy_keys.index('rule-set:ai-cn,direct,icloud,apple')
+        domestic_dns = policy_keys.index('rule-set:ai-cn')
         self.assertLess(rules.index('RULE-SET,cn-ai-extra,DIRECT'),
                         rules.index('RULE-SET,anthropic-bootstrap,Claude 专用,no-resolve'))
         for provider in ['gemini-bootstrap', 'meta-bootstrap', 'ai-shared', 'gemini',
                          'twitter-ai', 'bing-ai', 'google']:
             route = rules.index(f'RULE-SET,{provider},故障转移,no-resolve')
             self.assertLess(route, domestic_route, provider)
-            self.assertLess(route, rules.index('RULE-SET,applications,DIRECT'), provider)
             self.assertEqual(rules[route - 1], f'AND,((NETWORK,UDP),(RULE-SET,{provider})),REJECT')
             dns_key = next(key for key in policy_keys if key.startswith('rule-set:')
                            and provider in key.removeprefix('rule-set:').split(','))
@@ -235,7 +241,7 @@ class PolicyTest(unittest.TestCase):
         raw = 'https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/'
         providers = self.template['rule-providers'].values()
         remote = [provider for provider in providers if provider['type'] == 'http']
-        self.assertEqual(len(remote), 22)
+        self.assertEqual(len(remote), 17)
         for provider in remote:
             self.assertTrue(provider['url'].startswith(raw + 'rules/'))
         for group in self.template['proxy-groups']:

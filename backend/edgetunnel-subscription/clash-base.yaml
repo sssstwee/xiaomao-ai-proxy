@@ -87,23 +87,18 @@ rules:
   - RULE-SET,lancidr,DIRECT,no-resolve
   - RULE-SET,line,默认代理
   - RULE-SET,line-ip,默认代理,no-resolve
-  - RULE-SET,applications,DIRECT
   - RULE-SET,ai-cn,DIRECT
   - AND,((NETWORK,UDP),(RULE-SET,ai)),REJECT
   - RULE-SET,ai,故障转移
-  - RULE-SET,reject,REJECT
+  - RULE-SET,reject,默认代理
   - RULE-SET,tld-not-cn,默认代理
   - RULE-SET,gfw,默认代理
   - RULE-SET,telegramcidr,默认代理,no-resolve
   - RULE-SET,proxy,默认代理
-  - RULE-SET,icloud,DIRECT
-  - RULE-SET,apple,DIRECT
   - AND,((NETWORK,TCP),(DOMAIN,perfops2.byte-test.com)),默认代理
-  - RULE-SET,direct,DIRECT
-  - RULE-SET,cncidr,DIRECT,no-resolve
   - GEOSITE,cn,DIRECT
-  - GEOIP,CN,DIRECT
   - MATCH,默认代理
+  - NETWORK,UDP,REJECT
 mode: rule
 tcp-concurrent: true
 keep-alive-interval: 30
@@ -127,22 +122,6 @@ rule-providers:
     path: ./ruleset/edgetunnel-reject.yaml
     interval: 86400
     proxy: 默认代理
-  icloud:
-    type: http
-    behavior: domain
-    format: yaml
-    url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/icloud.yaml
-    path: ./ruleset/edgetunnel-icloud.yaml
-    interval: 86400
-    proxy: 默认代理
-  apple:
-    type: http
-    behavior: domain
-    format: yaml
-    url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/apple.yaml
-    path: ./ruleset/edgetunnel-apple.yaml
-    interval: 86400
-    proxy: 默认代理
   google:
     type: http
     behavior: domain
@@ -157,14 +136,6 @@ rule-providers:
     format: yaml
     url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/proxy.yaml
     path: ./ruleset/edgetunnel-proxy.yaml
-    interval: 86400
-    proxy: 默认代理
-  direct:
-    type: http
-    behavior: domain
-    format: yaml
-    url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/direct.yaml
-    path: ./ruleset/edgetunnel-direct.yaml
     interval: 86400
     proxy: 默认代理
   private:
@@ -199,28 +170,12 @@ rule-providers:
     path: ./ruleset/edgetunnel-telegramcidr.yaml
     interval: 86400
     proxy: 默认代理
-  cncidr:
-    type: http
-    behavior: ipcidr
-    format: yaml
-    url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/cncidr.yaml
-    path: ./ruleset/edgetunnel-cncidr.yaml
-    interval: 86400
-    proxy: 默认代理
   lancidr:
     type: http
     behavior: ipcidr
     format: yaml
     url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/lancidr.yaml
     path: ./ruleset/edgetunnel-lancidr.yaml
-    interval: 86400
-    proxy: 默认代理
-  applications:
-    type: http
-    behavior: classical
-    format: yaml
-    url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/applications.yaml
-    path: ./ruleset/edgetunnel-applications.yaml
     interval: 86400
     proxy: 默认代理
   line:
@@ -1160,14 +1115,14 @@ dns:
     - https://dns.alidns.com/dns-query#DIRECT
     - https://doh.pub/dns-query#DIRECT
   direct-nameserver:
-    - https://dns.alidns.com/dns-query
-    - https://doh.pub/dns-query
+    - https://dns.alidns.com/dns-query#DIRECT
+    - https://doh.pub/dns-query#DIRECT
   direct-nameserver-follow-policy: false
   respect-rules: true
   nameserver-policy:
     rule-set:cn-ai-extra:
-      - https://dns.alidns.com/dns-query
-      - https://doh.pub/dns-query
+      - https://dns.alidns.com/dns-query#DIRECT
+      - https://doh.pub/dns-query#DIRECT
     +.claude.ai:
       - https://cloudflare-dns.com/dns-query#Claude 专用
     +.anthropic.com:
@@ -1198,17 +1153,20 @@ dns:
     rule-set:line:
       - https://cloudflare-dns.com/dns-query#默认代理
       - https://dns.google/dns-query#默认代理
+    rule-set:private:
+      - system://
+    rule-set:ai-cn:
+      - https://dns.alidns.com/dns-query#DIRECT
+      - https://doh.pub/dns-query#DIRECT
     rule-set:ai:
       - https://cloudflare-dns.com/dns-query#故障转移
       - https://dns.google/dns-query#故障转移
-    rule-set:ai-cn,direct,icloud,apple:
-      - https://dns.alidns.com/dns-query
-      - https://doh.pub/dns-query
-    rule-set:private:
-      - system://
+    rule-set:reject,tld-not-cn,gfw,proxy:
+      - https://cloudflare-dns.com/dns-query#默认代理
+      - https://dns.google/dns-query#默认代理
     geosite:cn:
-      - https://dns.alidns.com/dns-query
-      - https://doh.pub/dns-query
+      - https://dns.alidns.com/dns-query#DIRECT
+      - https://doh.pub/dns-query#DIRECT
   fake-ip-range: 198.18.0.1/16
   fake-ip-filter:
     - "*.lan"

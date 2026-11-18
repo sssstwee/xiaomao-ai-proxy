@@ -10,7 +10,9 @@ Claude、OpenAI 的核心域名与 DNS 分别进入各自的独立 fallback，�
 
 2026-11-15 参考 JMS 的 11 月 14 日 AI 覆盖补充：内联 Gemini、Meta 引导域名，以及 Claude 第三方依赖和海外 AI 补充清单的去重并集（207 条）。包含 DeepL / Lara / Yandex、character.ai、Replicate、Runway、v0、Bolt、Lovable、Suno、Together、Fireworks、DeepInfra、LMArena 等。共享依赖按域名进入“故障转移”，不将 JMS 的美国节点编号或客户端进程策略复制到模板。Google 共享域、Gemini、Twitter 与 Bing 均使用与 JMS 相同的成熟 MetaCubeX 清单，镜像到资源仓库并每日更新。国内 AI 显式例外在最前；固定 AI 主站与依赖先于宽泛国内 AI、应用、广告和国内地址规则，DNS 采用相同优先级。
 
-Claude / ChatGPT 核心 DNS 分别经对应严格代理组使用 Cloudflare DoH；严格回源不能可靠访问 Google DoH，因此不将其放入这两个 DNS 策略。普通及公共依赖 DNS 保留 Cloudflare 与 Google DoH；国内和私有域名走直连 DNS。Cloudflare DoH 使用 `cloudflare-dns.com` 域名保留 TLS SNI。`proxy-server-nameserver` 单独解析节点域名，避免循环依赖。顶层和 DNS 均关闭 IPv6；全局拒绝 UDP 443 以保留移动网络 QUIC 回落，AI UDP 防直连规则同样保留。模板面向 Mihomo；不保证所有语音客户端都支持 TCP 回落。
+国内 AI、`GEOSITE,cn` 国内域名、原有局域网域名和私有网段走直连。其余流量按专用规则或 `默认代理` 转发，包括仅有中国公网 IP 的连接。
+
+Claude 和 ChatGPT 的核心域名通过各自的代理组查询 Cloudflare DoH。普通海外流量和公共依赖使用各自代理组中的 Cloudflare 或 Google DoH。国内域名使用国内 DoH，局域网域名沿用系统 DNS。`proxy-server-nameserver` 负责解析节点域名。模板启用 IPv6 TUN，DNS 保留原 IPv4 解析设置。EdgeTunnel 拦截 UDP/443，使支持回落的客户端改走 TCP。默认代理无法承载的其他 UDP 请求也会被拦截。
 
 EdgeTunnel 按用户最新要求，仅保留原 AI 组的十六条 `洛杉矶NN · AI`（`/proxyip-only=`）节点，移除原十条普通节点。普通故障转移、自动选择与 Claude / ChatGPT 专用组共用这些节点；两个 AI 组仍为独立 fallback，AI 规则、DNS 与 UDP/443 防直连策略保持原样。普通组两个探活地址使用支持 HEAD 的 `https://cp.cloudflare.com/generate_204`（预期 204），严格路径不在 Worker 本地合成测速响应；API 专用组继续使用各自 API 探活。判断探活还须核对对应 URL 的 `extra.alive` 与响应状态，不能只检查返回 delay。Cloudflare trace 仅用 GET 做独立出口核验。严格路径此前对 Google / YouTube 及部分公共资源出现 TLS 失败，共用节点不代表通用网站兼容性已解决，也不承诺 ≤250ms。Voyra 的普通组成员不变；共享探活地址已单独验证其现有六条节点。
 
@@ -33,12 +35,12 @@ python3 routing_policy.py --config /opt/voyra-subscription/vpn.yml --mihomo /usr
 python3 -m unittest discover -s backend/edgetunnel-subscription -p 'test_*.py' -v
 ```
 
-修改托管 YAML 后，EdgeTunnel 等待 Worker 模板缓存（300 秒）失效，Voyra 等待定时同步或手动启动同步服务，再更新客户端订阅。不要在 Worker 中另写一份分组/业务规则。Clash Verge 覆写脚本和客户端 DNS 设置也不应覆盖托管策略。
+修改托管 YAML 后，更新 `acl4ssr.ini` 引用的模板提交。EdgeTunnel 等待 Worker 模板缓存（300 秒）失效，Voyra 等待定时同步或手动启动同步服务，再更新客户端订阅。分流与 DNS 以托管模板为准。
 
 历史 VPS 转换后端的部署与回退方式见 [converter/README.md](converter/README.md)。线上节点凭据、转换后端私密地址和备份不入库。
 
 ## 公共资源归档
 
-22 个远程规则集、6 个共享图标、Voyra QUIC 图标和 Voice JSON 全部引用 [sssstwee/edgetunnel/resources](https://github.com/sssstwee/edgetunnel/tree/main/resources)。GeoIP / GeoSite / MetaDB / ASN 四个大数据文件引用该仓库 Releases，并在 `geox-url` 中显式指定；保持 MMDB 模式，每 24 小时更新，避免内核回到默认第三方下载地址。转换层和 Voyra 同步均保留这些字段。10 个 inline 规则集继续保存在本模板。
+17 个远程规则集、6 个共享图标、Voyra QUIC 图标和 Voice JSON 全部引用 [sssstwee/edgetunnel/resources](https://github.com/sssstwee/edgetunnel/tree/main/resources)。GeoIP / GeoSite / MetaDB / ASN 四个大数据文件引用该仓库 Releases，并在 `geox-url` 中显式指定；保持 MMDB 模式，每 24 小时更新，避免内核回到默认第三方下载地址。转换层和 Voyra 同步均保留这些字段。10 个 inline 规则集继续保存在本模板。
 
 资源仓库每天同步已使用的成熟上游数据，保留来源提交、SHA256、许可证及最后可用快照；更新失败不会清空现有资源。规则和图标使用固定的自有 main 地址，Geo 数据使用自有 `releases/latest/download` 地址。业务规则在此处维护，资源来源在资源仓库的 `sources.json` 维护；不要将鉴权和节点凭据复制到公共文件。
