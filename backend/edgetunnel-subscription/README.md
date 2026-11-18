@@ -10,7 +10,7 @@ Claude、OpenAI 的核心域名与 DNS 分别进入各自的独立 fallback，�
 
 2026-11-15 参考 JMS 的 11 月 14 日 AI 覆盖补充：内联 Gemini、Meta 引导域名，以及 Claude 第三方依赖和海外 AI 补充清单的去重并集（207 条）。包含 DeepL / Lara / Yandex、character.ai、Replicate、Runway、v0、Bolt、Lovable、Suno、Together、Fireworks、DeepInfra、LMArena 等。共享依赖按域名进入“故障转移”，不将 JMS 的美国节点编号或客户端进程策略复制到模板。Google 共享域、Gemini、Twitter 与 Bing 均使用与 JMS 相同的成熟 MetaCubeX 清单，镜像到资源仓库并每日更新。国内 AI 显式例外在最前；固定 AI 主站与依赖先于宽泛国内 AI、应用、广告和国内地址规则，DNS 采用相同优先级。
 
-国内 AI、`GEOSITE,cn` 国内域名、原有局域网域名和私有网段走直连。其余流量按专用规则或 `默认代理` 转发，包括仅有中国公网 IP 的连接。
+国内 AI、原有 Loyalsoldier 和 `GEOSITE,cn` 国内域名、局域网域名和私有网段走直连。其余流量按专用规则或 `默认代理` 转发，包括仅有中国公网 IP 的连接。
 
 Claude 和 ChatGPT 的核心域名通过各自的代理组查询 Cloudflare DoH。普通海外流量和公共依赖使用各自代理组中的 Cloudflare 或 Google DoH。国内域名使用国内 DoH，局域网域名沿用系统 DNS。`proxy-server-nameserver` 负责解析节点域名。模板启用 IPv6 TUN，DNS 保留原 IPv4 解析设置。EdgeTunnel 拦截 UDP/443，使支持回落的客户端改走 TCP。默认代理无法承载的其他 UDP 请求也会被拦截。
 
@@ -41,6 +41,6 @@ python3 -m unittest discover -s backend/edgetunnel-subscription -p 'test_*.py' -
 
 ## 公共资源归档
 
-17 个远程规则集、6 个共享图标、Voyra QUIC 图标和 Voice JSON 全部引用 [sssstwee/edgetunnel/resources](https://github.com/sssstwee/edgetunnel/tree/main/resources)。GeoIP / GeoSite / MetaDB / ASN 四个大数据文件引用该仓库 Releases，并在 `geox-url` 中显式指定；保持 MMDB 模式，每 24 小时更新，避免内核回到默认第三方下载地址。转换层和 Voyra 同步均保留这些字段。10 个 inline 规则集继续保存在本模板。
+18 个远程规则集、6 个共享图标、Voyra QUIC 图标和 Voice JSON 全部引用 [sssstwee/edgetunnel/resources](https://github.com/sssstwee/edgetunnel/tree/main/resources)。GeoIP / GeoSite / MetaDB / ASN 四个大数据文件引用该仓库 Releases，并在 `geox-url` 中显式指定；保持 MMDB 模式，每 24 小时更新，避免内核回到默认第三方下载地址。转换层和 Voyra 同步均保留这些字段。10 个 inline 规则集继续保存在本模板。
 
 资源仓库每天同步已使用的成熟上游数据，保留来源提交、SHA256、许可证及最后可用快照；更新失败不会清空现有资源。规则和图标使用固定的自有 main 地址，Geo 数据使用自有 `releases/latest/download` 地址。业务规则在此处维护，资源来源在资源仓库的 `sources.json` 维护；不要将鉴权和节点凭据复制到公共文件。

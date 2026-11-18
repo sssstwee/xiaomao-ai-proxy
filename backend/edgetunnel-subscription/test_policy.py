@@ -70,7 +70,7 @@ class PolicyTest(unittest.TestCase):
         self.assertLess(rules.index(chatgpt), rules.index('GEOSITE,cn,DIRECT'))
         self.assertEqual([rule for rule in rules if ',DIRECT' in rule], [
             'RULE-SET,cn-ai-extra,DIRECT', 'RULE-SET,private,DIRECT', 'RULE-SET,lancidr,DIRECT,no-resolve',
-            'RULE-SET,ai-cn,DIRECT', 'GEOSITE,cn,DIRECT',
+            'RULE-SET,ai-cn,DIRECT', 'RULE-SET,direct,DIRECT', 'GEOSITE,cn,DIRECT',
         ])
         self.assertEqual(rules[-2:], ['MATCH,默认代理', 'NETWORK,UDP,REJECT'])
         self.assertEqual(rules[0], 'AND,((NETWORK,UDP),(DST-PORT,443)),REJECT')
@@ -241,7 +241,7 @@ class PolicyTest(unittest.TestCase):
         raw = 'https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/'
         providers = self.template['rule-providers'].values()
         remote = [provider for provider in providers if provider['type'] == 'http']
-        self.assertEqual(len(remote), 17)
+        self.assertEqual(len(remote), 18)
         for provider in remote:
             self.assertTrue(provider['url'].startswith(raw + 'rules/'))
         for group in self.template['proxy-groups']:
