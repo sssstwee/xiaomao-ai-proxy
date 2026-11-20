@@ -50,6 +50,17 @@ proxy-groups:
     expected-status: "401"
     include-all-proxies: true
     exclude-filter: (?i)warp|^cf-tcp-backup$|^普通| · 普通$
+  - name: Gemini 专用
+    icon: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/icons/Gemini.png
+    type: fallback
+    url: https://generativelanguage.googleapis.com/v1beta/models
+    interval: 600
+    lazy: true
+    timeout: 5000
+    max-failed-times: 3
+    expected-status: "403/404"
+    include-all-proxies: true
+    exclude-filter: (?i)warp|^cf-tcp-backup$|^普通| · 普通$
 rules:
   - AND,((NETWORK,UDP),(DST-PORT,443)),REJECT
   - RULE-SET,cn-ai-extra,DIRECT
@@ -68,11 +79,11 @@ rules:
   - AND,((NETWORK,UDP),(RULE-SET,openai-voice)),REJECT
   - RULE-SET,openai-voice,ChatGPT 专用,no-resolve
   - AND,((NETWORK,UDP),(RULE-SET,gemini-bootstrap)),REJECT
-  - RULE-SET,gemini-bootstrap,故障转移,no-resolve
+  - RULE-SET,gemini-bootstrap,Gemini 专用,no-resolve
   - AND,((NETWORK,UDP),(RULE-SET,meta-bootstrap)),REJECT
   - RULE-SET,meta-bootstrap,故障转移,no-resolve
   - AND,((NETWORK,UDP),(RULE-SET,gemini)),REJECT
-  - RULE-SET,gemini,故障转移,no-resolve
+  - RULE-SET,gemini,Gemini 专用,no-resolve
   - AND,((NETWORK,UDP),(RULE-SET,ai-shared)),REJECT
   - RULE-SET,ai-shared,故障转移,no-resolve
   - AND,((NETWORK,UDP),(RULE-SET,twitter-ai)),REJECT
@@ -80,7 +91,7 @@ rules:
   - AND,((NETWORK,UDP),(RULE-SET,bing-ai)),REJECT
   - RULE-SET,bing-ai,故障转移,no-resolve
   - AND,((NETWORK,UDP),(RULE-SET,google)),REJECT
-  - RULE-SET,google,故障转移,no-resolve
+  - RULE-SET,google,Gemini 专用,no-resolve
   - AND,((NETWORK,UDP),(RULE-SET,ai-resources)),REJECT
   - RULE-SET,ai-resources,故障转移,no-resolve
   - AND,((NETWORK,UDP),(RULE-SET,artifact-resources)),REJECT
@@ -101,13 +112,16 @@ rules:
   - RULE-SET,direct,DIRECT
   - GEOSITE,cn,DIRECT
   - RULE-SET,cncidr,DIRECT,no-resolve
+  # Unlisted hosts from Antigravity and Gemini binaries; domestic and LAN traffic stays direct above.
+  - PROCESS-NAME-REGEX,(?i)^(antigravity|gemini)( helper.*| \(.*\))?(\.exe)?$,Gemini 专用
+  - PROCESS-PATH-REGEX,(?i)(/Applications/Antigravity\.app/|\\Programs\\Antigravity\\),Gemini 专用
   - MATCH,默认代理
   - NETWORK,UDP,REJECT
 mode: rule
 tcp-concurrent: true
 keep-alive-interval: 30
 keep-alive-idle: 30
-find-process-mode: 'off'
+find-process-mode: strict
 ipv6: true
 sniffer:
   enable: true
@@ -1246,8 +1260,8 @@ dns:
     +.chatgpt.com:
       - https://cloudflare-dns.com/dns-query#ChatGPT 专用
     +.gemini.google.com:
-      - https://cloudflare-dns.com/dns-query#故障转移
-      - https://dns.google/dns-query#故障转移
+      - https://cloudflare-dns.com/dns-query#Gemini 专用
+      - https://dns.google/dns-query#Gemini 专用
     +.muse.ai:
       - https://cloudflare-dns.com/dns-query#故障转移
       - https://dns.google/dns-query#故障转移
@@ -1260,7 +1274,10 @@ dns:
       - https://cloudflare-dns.com/dns-query#Claude 专用
     rule-set:openai-bootstrap,openai:
       - https://cloudflare-dns.com/dns-query#ChatGPT 专用
-    rule-set:gemini-bootstrap,gemini,meta-bootstrap,ai-shared,twitter-ai,bing-ai,google:
+    rule-set:gemini-bootstrap,gemini,google:
+      - https://cloudflare-dns.com/dns-query#Gemini 专用
+      - https://dns.google/dns-query#Gemini 专用
+    rule-set:meta-bootstrap,ai-shared,twitter-ai,bing-ai:
       - https://cloudflare-dns.com/dns-query#故障转移
       - https://dns.google/dns-query#故障转移
     rule-set:ai-resources,artifact-resources:

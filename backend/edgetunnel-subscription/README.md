@@ -2,13 +2,15 @@
 
 `acl4ssr.ini` 通过 subconverter 原生 `clash_rule_base` 加载 `clash-base.yaml`。**分组、图标、服务探活、规则集、AI 分流、DNS 和 UDP 防直连规则统一维护在 `clash-base.yaml`。** INI 关闭规则生成与覆盖，EdgeTunnel 的内置转换按模板合并最终配置；模板中的 `include-all-proxies` 由转换层解析为本次订阅的显式成员列表，保留原节点顺序，并完整保留图标及 Mihomo 专有字段。
 
-`默认代理`（select）包含 `自动选择`（url-test，300 秒，100ms 容差）和 `故障转移`（fallback，按订阅顺序选择健康节点，300 秒）。2026-11-11 起移除 `负载均衡`（round-robin），健康检查统一为 timeout 5000、lazy true、max-failed-times 3，以减少对 Worker 的探活请求。已保存的手动选择需在客户端切换。`Claude 专用` 和 `ChatGPT 专用` 各自使用 fallback（600 秒）。图标采用固定版本的 Qure：默认代理为蓝色箭头，自动选择为黄色闪电，故障转移为绿色心跳，文件镜像在自有资源仓库。两个 AI 组排除 WARP、`cf-tcp-backup` 和 `普通` 标识节点：Voyra 保持 VPS 原生出口，EdgeTunnel 继续使用自己的节点，两者不复制节点凭据。
+`默认代理`（select）包含 `自动选择`（url-test，300 秒，100ms 容差）和 `故障转移`（fallback，按订阅顺序选择健康节点，300 秒）。2026-11-11 起移除 `负载均衡`（round-robin），健康检查统一为 timeout 5000、lazy true、max-failed-times 3，以减少对 Worker 的探活请求。已保存的手动选择需在客户端切换。`Claude 专用`、`ChatGPT 专用` 和 `Gemini 专用` 各自使用 fallback（600 秒）。图标采用固定版本的 Qure：默认代理为蓝色箭头，自动选择为黄色闪电，故障转移为绿色心跳，文件镜像在自有资源仓库。三个 AI 组排除 WARP、`cf-tcp-backup` 和 `普通` 标识节点：Voyra 保持 VPS 原生出口，EdgeTunnel 继续使用自己的节点，两者不复制节点凭据。
 
 Claude / OpenAI 分别使用 MetaCubeX 的每日更新域名规则，并内联已审查的主站、认证、CDN、功能开关和资源域名作为首次启动保障。Claude 专属 Auth0 先于 OpenAI 共用认证；同时保留 Anthropic 官方入站 IP、OpenAI 语音网段和 Artifacts 资源。Voice 网段来自 [OpenAI 官方 JSON](https://openai.com/chatgpt-voice.json)，同步脚本及定制 Worker 刷新时读取自有仓库的 JSON 镜像，失败保留模板快照。
 
-Claude、OpenAI 的核心域名与 DNS 分别进入各自的独立 fallback，优先于共享资源。通用海外 AI、Gemini / NotebookLM / AI Studio、Meta Muse、Grok / X、Copilot / Bing、翻译与生成服务及其 DNS 使用“故障转移”，AI 连接不随“默认代理”的选择切换。Artifacts 字体和脚本、登录、验证码、安装更新、MCP 连接器、公共 CDN 与遥测主机也使用该组。这些主机为多个应用共享，其他应用访问同一主机也采用该路径；同理，Google / YouTube、X 和 Bing 的共享域整体进入故障转移。fallback 在健康变化时仍可能切换节点，已有长连接不会自动迁移。
+Claude、OpenAI 的核心域名与 DNS 分别进入各自的独立 fallback，优先于共享资源。通用海外 AI、Meta Muse、Grok / X、Copilot / Bing、翻译与生成服务及其 DNS 使用“故障转移”，AI 连接不随“默认代理”的选择切换。Artifacts 字体和脚本、登录、验证码、安装更新、MCP 连接器、公共 CDN 与遥测主机也使用该组。这些主机为多个应用共享，其他应用访问同一主机也采用该路径；同理，X 和 Bing 的共享域整体进入故障转移。fallback 在健康变化时仍可能切换节点，已有长连接不会自动迁移。
 
 2026-11-15 参考 JMS 的 11 月 14 日 AI 覆盖补充：内联 Gemini、Meta 引导域名，以及 Claude 第三方依赖和海外 AI 补充清单的去重并集（207 条）。包含 DeepL / Lara / Yandex、character.ai、Replicate、Runway、v0、Bolt、Lovable、Suno、Together、Fireworks、DeepInfra、LMArena 等。共享依赖按域名进入“故障转移”，不将 JMS 的美国节点编号或客户端进程策略复制到模板。Google 共享域、Gemini、Twitter 与 Bing 均使用与 JMS 相同的成熟 MetaCubeX 清单，镜像到资源仓库并每日更新。国内 AI 显式例外在最前；固定 AI 主站与依赖先于宽泛国内 AI、应用、广告和国内地址规则，DNS 采用相同优先级。
+
+2026-11-20 起，Gemini / Antigravity / NotebookLM / AI Studio / Jules 的内联引导域名（`gemini-bootstrap`）、MetaCubeX `google-gemini` 清单以及 Google 共享域（`google`，含账号登录、YouTube 等）的路由与 DNS 统一使用 `Gemini 专用`（fallback，600 秒，探活 `generativelanguage.googleapis.com/v1beta/models`；Mihomo 以 HEAD 探活，无密钥时返回 404，GET 返回 403，均视为可达），使 Gemini 与其登录、静态资源同一出口。`find-process-mode` 改为 `strict`；在国内与局域网直连规则之后、`MATCH` 之前，Antigravity 应用（macOS `/Applications/Antigravity.app/`、Windows `Programs\Antigravity\`）及名为 `gemini` 的进程未被域名规则命中的流量也进入 `Gemini 专用`。Gemini CLI 以 `node` 运行时不匹配进程规则，依赖上述域名规则。Voyra 的 QUIC 子规则对这些流量继续 REJECT。
 
 国内 AI、原有 Loyalsoldier 和 `GEOSITE,cn` 国内域名、局域网域名和私有网段走直连。没有可识别域名、目标属于中国大陆网段（`cncidr`，`no-resolve`）的纯 IP 连接也直连，规则位于全部 AI 与代理规则之后、`MATCH` 之前；域名流量不在本地解析。其余流量按专用规则或 `默认代理` 转发。模板启用 HTTP / TLS / QUIC 嗅探（`parse-pure-ip`，不改写目的地址），自带 DoH 或直连 IP 的应用也按真实域名分流；Voyra 同步不写入 `sniffer`，保留其现有设置。
 
@@ -43,6 +45,6 @@ python3 -m unittest discover -s backend/edgetunnel-subscription -p 'test_*.py' -
 
 ## 公共资源归档
 
-19 个远程规则集、6 个共享图标、Voyra QUIC 图标和 Voice JSON 全部引用 [sssstwee/edgetunnel/resources](https://github.com/sssstwee/edgetunnel/tree/main/resources)。GeoIP / GeoSite / MetaDB / ASN 四个大数据文件引用该仓库 Releases，并在 `geox-url` 中显式指定；保持 MMDB 模式，每 24 小时更新，避免内核回到默认第三方下载地址。转换层和 Voyra 同步均保留这些字段。11 个 inline 规则集继续保存在本模板。
+19 个远程规则集、7 个共享图标、Voyra QUIC 图标和 Voice JSON 全部引用 [sssstwee/edgetunnel/resources](https://github.com/sssstwee/edgetunnel/tree/main/resources)。GeoIP / GeoSite / MetaDB / ASN 四个大数据文件引用该仓库 Releases，并在 `geox-url` 中显式指定；保持 MMDB 模式，每 24 小时更新，避免内核回到默认第三方下载地址。转换层和 Voyra 同步均保留这些字段。11 个 inline 规则集继续保存在本模板。
 
 资源仓库每天同步已使用的成熟上游数据，保留来源提交、SHA256、许可证及最后可用快照；更新失败不会清空现有资源。规则和图标使用固定的自有 main 地址，Geo 数据使用自有 `releases/latest/download` 地址。业务规则在此处维护，资源来源在资源仓库的 `sources.json` 维护；不要将鉴权和节点凭据复制到公共文件。
