@@ -72,7 +72,7 @@ class PolicyTest(unittest.TestCase):
         claude = 'RULE-SET,anthropic-bootstrap,Claude 专用,no-resolve'
         chatgpt = 'RULE-SET,openai-bootstrap,ChatGPT 专用,no-resolve'
         self.assertLess(rules.index(claude), rules.index(chatgpt))
-        self.assertLess(rules.index(chatgpt), rules.index('RULE-SET,reject,默认代理'))
+        self.assertLess(rules.index(chatgpt), rules.index('RULE-SET,reject,REJECT'))
         self.assertLess(rules.index(chatgpt), rules.index('GEOSITE,cn,DIRECT'))
         self.assertEqual([rule for rule in rules if ',DIRECT' in rule], [
             'RULE-SET,cn-ai-extra,DIRECT', 'RULE-SET,private,DIRECT', 'RULE-SET,lancidr,DIRECT,no-resolve',
@@ -255,6 +255,12 @@ class PolicyTest(unittest.TestCase):
         self.assertEqual(len(remote), 19)
         for provider in remote:
             self.assertTrue(provider['url'].startswith(raw + 'rules/'))
+            # Large domain / IP lists load as Mihomo binary rule sets; classical lists stay YAML.
+            binary = provider['behavior'] in ['domain', 'ipcidr']
+            self.assertEqual(provider['format'], 'mrs' if binary else 'yaml', provider['url'])
+            self.assertTrue(provider['url'].endswith('.mrs' if binary else '.yaml'), provider['url'])
+            self.assertTrue(provider['path'].endswith('.mrs' if binary else '.yaml'), provider['path'])
+        self.assertEqual(sum(provider['format'] == 'mrs' for provider in remote), 18)
         for group in self.template['proxy-groups']:
             self.assertTrue(group['icon'].startswith(raw + 'icons/'))
         self.assertEqual(SYNC.VOICE_SOURCE, raw + 'data/chatgpt-voice.json')
@@ -335,6 +341,17 @@ class PolicyTest(unittest.TestCase):
             self.assertIn(f'RULE-SET,{provider},REJECT,no-resolve', quic)
         for rule in PROCESS_RULES:
             self.assertIn(rule.rsplit(',', 1)[0] + ',REJECT', quic)
+
+    def test_ad_and_tracker_list_is_blocked_after_ai_and_before_domestic_rules(self):
+        rules = self.template['rules']
+        block = rules.index('RULE-SET,reject,REJECT')
+        self.assertNotIn('RULE-SET,reject,默认代理', rules)
+        for rule in ['RULE-SET,claude-deps,Claude 专用,no-resolve', 'RULE-SET,openai-bootstrap,ChatGPT 专用,no-resolve',
+                     'RULE-SET,google,Gemini 专用,no-resolve', 'RULE-SET,ai-cn,DIRECT', 'RULE-SET,ai,故障转移']:
+            self.assertLess(rules.index(rule), block, rule)
+        self.assertLess(block, rules.index('RULE-SET,direct,DIRECT'))
+        self.assertFalse(any('reject' in key.removeprefix('rule-set:').split(',')
+                             for key in self.template['dns']['nameserver-policy'] if key.startswith('rule-set:')))
 
 
 if __name__ == '__main__':
