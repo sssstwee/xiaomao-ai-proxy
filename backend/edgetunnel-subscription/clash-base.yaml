@@ -103,7 +103,7 @@ rules:
   - RULE-SET,ai-cn,DIRECT
   - AND,((NETWORK,UDP),(RULE-SET,ai)),REJECT
   - RULE-SET,ai,故障转移
-  - RULE-SET,reject,默认代理
+  - RULE-SET,reject,REJECT
   - RULE-SET,tld-not-cn,默认代理
   - RULE-SET,gfw,默认代理
   - RULE-SET,telegramcidr,默认代理,no-resolve
@@ -147,121 +147,121 @@ rule-providers:
   reject:
     type: http
     behavior: domain
-    format: yaml
-    url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/reject.yaml
-    path: ./ruleset/edgetunnel-reject.yaml
+    format: mrs
+    url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/reject.mrs
+    path: ./ruleset/edgetunnel-reject.mrs
     interval: 86400
     proxy: 默认代理
   google:
     type: http
     behavior: domain
-    format: yaml
-    url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/google.yaml
-    path: ./ruleset/edgetunnel-google.yaml
+    format: mrs
+    url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/google.mrs
+    path: ./ruleset/edgetunnel-google.mrs
     interval: 86400
     proxy: 默认代理
   proxy:
     type: http
     behavior: domain
-    format: yaml
-    url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/proxy.yaml
-    path: ./ruleset/edgetunnel-proxy.yaml
+    format: mrs
+    url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/proxy.mrs
+    path: ./ruleset/edgetunnel-proxy.mrs
     interval: 86400
     proxy: 默认代理
   direct:
     type: http
     behavior: domain
-    format: yaml
-    url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/direct.yaml
-    path: ./ruleset/edgetunnel-direct.yaml
+    format: mrs
+    url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/direct.mrs
+    path: ./ruleset/edgetunnel-direct.mrs
     interval: 86400
     proxy: 默认代理
   private:
     type: http
     behavior: domain
-    format: yaml
-    url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/private.yaml
-    path: ./ruleset/edgetunnel-private.yaml
+    format: mrs
+    url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/private.mrs
+    path: ./ruleset/edgetunnel-private.mrs
     interval: 86400
     proxy: 默认代理
   gfw:
     type: http
     behavior: domain
-    format: yaml
-    url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/gfw.yaml
-    path: ./ruleset/edgetunnel-gfw.yaml
+    format: mrs
+    url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/gfw.mrs
+    path: ./ruleset/edgetunnel-gfw.mrs
     interval: 86400
     proxy: 默认代理
   tld-not-cn:
     type: http
     behavior: domain
-    format: yaml
-    url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/tld-not-cn.yaml
-    path: ./ruleset/edgetunnel-tld-not-cn.yaml
+    format: mrs
+    url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/tld-not-cn.mrs
+    path: ./ruleset/edgetunnel-tld-not-cn.mrs
     interval: 86400
     proxy: 默认代理
   cncidr:
     type: http
     behavior: ipcidr
-    format: yaml
-    url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/cncidr.yaml
-    path: ./ruleset/edgetunnel-cncidr.yaml
+    format: mrs
+    url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/cncidr.mrs
+    path: ./ruleset/edgetunnel-cncidr.mrs
     interval: 86400
     proxy: 默认代理
   telegramcidr:
     type: http
     behavior: ipcidr
-    format: yaml
-    url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/telegramcidr.yaml
-    path: ./ruleset/edgetunnel-telegramcidr.yaml
+    format: mrs
+    url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/telegramcidr.mrs
+    path: ./ruleset/edgetunnel-telegramcidr.mrs
     interval: 86400
     proxy: 默认代理
   lancidr:
     type: http
     behavior: ipcidr
-    format: yaml
-    url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/lancidr.yaml
-    path: ./ruleset/edgetunnel-lancidr.yaml
+    format: mrs
+    url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/lancidr.mrs
+    path: ./ruleset/edgetunnel-lancidr.mrs
     interval: 86400
     proxy: 默认代理
   line:
     type: http
     behavior: domain
-    format: yaml
-    url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/line.yaml
-    path: ./ruleset/edgetunnel-line.yaml
+    format: mrs
+    url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/line.mrs
+    path: ./ruleset/edgetunnel-line.mrs
     interval: 86400
     proxy: 默认代理
   ai:
     type: http
     behavior: domain
-    format: yaml
-    url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/ai.yaml
-    path: ./ruleset/edgetunnel-ai.yaml
+    format: mrs
+    url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/ai.mrs
+    path: ./ruleset/edgetunnel-ai.mrs
     interval: 86400
     proxy: 默认代理
   ai-cn:
     type: http
     behavior: domain
-    format: yaml
-    url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/ai-cn.yaml
-    path: ./ruleset/edgetunnel-ai-cn.yaml
+    format: mrs
+    url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/ai-cn.mrs
+    path: ./ruleset/edgetunnel-ai-cn.mrs
     interval: 86400
     proxy: 默认代理
   anthropic:
     type: http
     behavior: domain
-    format: yaml
-    url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/anthropic.yaml
-    path: ./ruleset/edgetunnel-anthropic.yaml
+    format: mrs
+    url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/anthropic.mrs
+    path: ./ruleset/edgetunnel-anthropic.mrs
     interval: 86400
     proxy: 默认代理
   openai:
     type: http
     behavior: domain
-    format: yaml
-    url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/openai.yaml
-    path: ./ruleset/edgetunnel-openai.yaml
+    format: mrs
+    url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/openai.mrs
+    path: ./ruleset/edgetunnel-openai.mrs
     interval: 86400
     proxy: 默认代理
   line-ip:
@@ -1210,25 +1210,25 @@ rule-providers:
   gemini:
     type: http
     behavior: domain
-    format: yaml
-    url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/gemini.yaml
-    path: ./ruleset/edgetunnel-gemini.yaml
+    format: mrs
+    url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/gemini.mrs
+    path: ./ruleset/edgetunnel-gemini.mrs
     interval: 86400
     proxy: 默认代理
   twitter-ai:
     type: http
     behavior: domain
-    format: yaml
-    url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/twitter.yaml
-    path: ./ruleset/edgetunnel-twitter-ai.yaml
+    format: mrs
+    url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/twitter.mrs
+    path: ./ruleset/edgetunnel-twitter-ai.mrs
     interval: 86400
     proxy: 默认代理
   bing-ai:
     type: http
     behavior: domain
-    format: yaml
-    url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/bing.yaml
-    path: ./ruleset/edgetunnel-bing-ai.yaml
+    format: mrs
+    url: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/rules/bing.mrs
+    path: ./ruleset/edgetunnel-bing-ai.mrs
     interval: 86400
     proxy: 默认代理
 dns:
@@ -1294,7 +1294,7 @@ dns:
     rule-set:ai:
       - https://cloudflare-dns.com/dns-query#故障转移
       - https://dns.google/dns-query#故障转移
-    rule-set:reject,tld-not-cn,gfw,proxy:
+    rule-set:tld-not-cn,gfw,proxy:
       - https://cloudflare-dns.com/dns-query#默认代理
       - https://dns.google/dns-query#默认代理
     rule-set:direct:
