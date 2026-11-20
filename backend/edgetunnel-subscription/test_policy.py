@@ -5,6 +5,12 @@ from pathlib import Path
 import yaml
 
 ROOT = Path(__file__).parent
+AI_GROUPS = ['Claude 专用', 'ChatGPT 专用', 'Gemini 专用']
+GEMINI_PROVIDERS = ['gemini-bootstrap', 'gemini', 'google']
+PROCESS_RULES = [
+    'PROCESS-NAME-REGEX,(?i)^(antigravity|gemini)( helper.*| \\(.*\\))?(\\.exe)?$,Gemini 专用',
+    'PROCESS-PATH-REGEX,(?i)(/Applications/Antigravity\\.app/|\\\\Programs\\\\Antigravity\\\\),Gemini 专用',
+]
 SPEC = importlib.util.spec_from_file_location('routing_policy', ROOT / 'routing_policy.py')
 SYNC = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(SYNC)
@@ -33,7 +39,7 @@ class PolicyTest(unittest.TestCase):
     def test_ai_excludes_warp_and_cloudflare_backup_without_direct_escape(self):
         config = SYNC.render(self.current, self.template)
         for group in config['proxy-groups']:
-            if group['name'] not in ['Claude 专用', 'ChatGPT 专用']:
+            if group['name'] not in AI_GROUPS:
                 continue
             pattern = __import__('re').compile(group['exclude-filter'])
             members = [node['name'] for node in config['proxies'] if not pattern.search(node['name'])]
@@ -58,7 +64,7 @@ class PolicyTest(unittest.TestCase):
         for name in ['故障转移', '自动选择']:
             self.assertEqual((groups[name]['interval'], groups[name]['timeout'], groups[name]['lazy'], groups[name]['max-failed-times']), (300, 5000, True, 3))
         self.assertEqual(groups['自动选择']['tolerance'], 100)
-        for name in ['Claude 专用', 'ChatGPT 专用']:
+        for name in AI_GROUPS:
             self.assertEqual((groups[name]['interval'], groups[name]['timeout'], groups[name]['lazy'], groups[name]['max-failed-times']), (600, 5000, True, 3))
 
     def test_ai_bootstrap_precedes_general_proxy_and_domestic_rules(self):
@@ -150,13 +156,13 @@ class PolicyTest(unittest.TestCase):
             'ai': '故障转移',
             'artifact-resources': '故障转移',
             'ai-resources': '故障转移',
-            'gemini-bootstrap': '故障转移',
+            'gemini-bootstrap': 'Gemini 专用',
             'meta-bootstrap': '故障转移',
             'ai-shared': '故障转移',
-            'gemini': '故障转移',
+            'gemini': 'Gemini 专用',
             'twitter-ai': '故障转移',
             'bing-ai': '故障转移',
-            'google': '故障转移',
+            'google': 'Gemini 专用',
         }
         for config in [self.template, SYNC.render(self.current, self.template, ['voyra-hy2-direct'])]:
             groups = {group['name']: group for group in config['proxy-groups']}
@@ -199,8 +205,10 @@ class PolicyTest(unittest.TestCase):
         ]
         config = SYNC.render(self.current, self.template)
         groups = {group['name']: group for group in config['proxy-groups']}
-        for name in ['Claude 专用', 'ChatGPT 专用']:
+        for name in AI_GROUPS:
             self.assertEqual(groups[name]['proxies'], ['192.0.2.1 洛杉矶 · AI', '192.0.2.2 洛杉矶 · AI'])
+            if name == 'Gemini 专用':
+                continue
             self.assertNotIn('dns.google', str(config['dns']['nameserver-policy'][
                 'rule-set:anthropic-bootstrap,anthropic' if name == 'Claude 专用'
                 else 'rule-set:openai-bootstrap,openai']))
@@ -232,7 +240,8 @@ class PolicyTest(unittest.TestCase):
                         rules.index('RULE-SET,anthropic-bootstrap,Claude 专用,no-resolve'))
         for provider in ['gemini-bootstrap', 'meta-bootstrap', 'ai-shared', 'gemini',
                          'twitter-ai', 'bing-ai', 'google']:
-            route = rules.index(f'RULE-SET,{provider},故障转移,no-resolve')
+            target = 'Gemini 专用' if provider in GEMINI_PROVIDERS else '故障转移'
+            route = rules.index(f'RULE-SET,{provider},{target},no-resolve')
             self.assertLess(route, domestic_route, provider)
             self.assertEqual(rules[route - 1], f'AND,((NETWORK,UDP),(RULE-SET,{provider})),REJECT')
             dns_key = next(key for key in policy_keys if key.startswith('rule-set:')
@@ -281,13 +290,51 @@ class PolicyTest(unittest.TestCase):
         rules = self.template['rules']
         route = rules.index('RULE-SET,cncidr,DIRECT,no-resolve')
         self.assertEqual(rules[route - 1], 'GEOSITE,cn,DIRECT')
-        self.assertEqual(rules[route + 1:], ['MATCH,默认代理', 'NETWORK,UDP,REJECT'])
+        self.assertEqual(rules[route + 1:-2], PROCESS_RULES)
+        self.assertEqual(rules[-2:], ['MATCH,默认代理', 'NETWORK,UDP,REJECT'])
         provider = self.template['rule-providers']['cncidr']
         self.assertEqual((provider['type'], provider['behavior']), ('http', 'ipcidr'))
         sniffer = self.template['sniffer']
         self.assertTrue(sniffer['enable'] and sniffer['parse-pure-ip'])
         self.assertFalse(sniffer['override-destination'])
         self.assertEqual(set(sniffer['sniff']), {'HTTP', 'TLS', 'QUIC'})
+
+    def test_gemini_and_antigravity_share_a_dedicated_group_for_routes_dns_and_processes(self):
+        groups = {group['name']: group for group in self.template['proxy-groups']}
+        gemini = groups['Gemini 专用']
+        claude = groups['Claude 专用']
+        self.assertEqual(gemini['type'], 'fallback')
+        self.assertEqual(gemini['url'], 'https://generativelanguage.googleapis.com/v1beta/models')
+        self.assertEqual(gemini['expected-status'], '403/404')
+        self.assertEqual(gemini['exclude-filter'], claude['exclude-filter'])
+        self.assertTrue(gemini['icon'].endswith('/icons/Gemini.png'))
+        rules = self.template['rules']
+        for provider in GEMINI_PROVIDERS:
+            route = rules.index(f'RULE-SET,{provider},Gemini 专用,no-resolve')
+            self.assertEqual(rules[route - 1], f'AND,((NETWORK,UDP),(RULE-SET,{provider})),REJECT')
+            self.assertGreater(route, rules.index('RULE-SET,openai-voice,ChatGPT 专用,no-resolve'))
+        payload = self.template['rule-providers']['gemini-bootstrap']['payload']
+        for host in ['antigravity-pa.googleapis.com', 'antigravity.googleapis.com', '+.antigravity.google',
+                     'cloudcode-pa.googleapis.com', '+.generativelanguage.googleapis.com', 'accounts.google.com']:
+            self.assertIn(host, payload)
+        policy = self.template['dns']['nameserver-policy']
+        for key in ['+.gemini.google.com', 'rule-set:gemini-bootstrap,gemini,google']:
+            self.assertTrue(all(server.endswith('#Gemini 专用') for server in policy[key]), key)
+        self.assertEqual(self.template['find-process-mode'], 'strict')
+        name, path = [__import__('re').compile(rule.split(',')[1]) for rule in PROCESS_RULES]
+        for process in ['Antigravity', 'Antigravity Helper (Renderer)', 'Antigravity.exe', 'gemini']:
+            self.assertTrue(name.search(process), process)
+        for process in ['Google Chrome', 'node', 'geminiweb']:
+            self.assertFalse(name.search(process), process)
+        for location in ['/Applications/Antigravity.app/Contents/Resources/app/extensions/antigravity/bin/language_server_macos_arm',
+                         'C:\\Users\\me\\AppData\\Local\\Programs\\Antigravity\\Antigravity.exe']:
+            self.assertTrue(path.search(location), location)
+        config = SYNC.render(self.current, self.template, ['voyra-hy2-direct'])
+        quic = config['sub-rules']['voyra-quic']
+        for provider in GEMINI_PROVIDERS:
+            self.assertIn(f'RULE-SET,{provider},REJECT,no-resolve', quic)
+        for rule in PROCESS_RULES:
+            self.assertIn(rule.rsplit(',', 1)[0] + ',REJECT', quic)
 
 
 if __name__ == '__main__':
