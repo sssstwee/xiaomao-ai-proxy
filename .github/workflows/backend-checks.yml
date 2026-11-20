@@ -1,0 +1,41 @@
+name: Backend checks
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - '.github/scripts/check-no-secrets.sh'
+      - '.github/workflows/backend-checks.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - '.github/scripts/check-no-secrets.sh'
+      - '.github/workflows/backend-checks.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: backend-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check for committed secrets
+        run: |
+          bash .github/scripts/check-no-secrets.sh
+          python3 -m unittest discover -s test/ci
+      - name: Hosted routing policy tests
+        run: |
+          python3 -m pip install --disable-pip-version-check pyyaml==6.0.2
+          python3 -m unittest discover -s backend/edgetunnel-subscription -p 'test_*.py' -v
