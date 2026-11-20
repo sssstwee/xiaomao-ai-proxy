@@ -14,7 +14,7 @@ Claude、OpenAI 的核心域名与 DNS 分别进入各自的独立 fallback，�
 
 2026-11-20 起，Loyalsoldier `reject` 广告与追踪清单由 `默认代理` 改为 `REJECT`，不再把广告请求转发到节点、消耗 Worker 请求额度；它位于全部 AI、Claude 依赖、Google / Gemini 和国内 AI 规则之后，这些服务自身依赖的统计主机（如 Segment、Google Analytics）仍按其原分组放行，DNS 策略也不再为该清单使用代理 DoH。18 个 domain / ipcidr 远程规则集改用资源仓库每日编译的 Mihomo 二进制格式（`.mrs`），降低客户端内存和加载时间；`line-ip` 为 classical 规则，保持 YAML。
 
-国内 AI、原有 Loyalsoldier 和 `GEOSITE,cn` 国内域名、局域网域名和私有网段走直连。没有可识别域名、目标属于中国大陆网段（`cncidr`，`no-resolve`）的纯 IP 连接也直连，规则位于全部 AI 与代理规则之后、`MATCH` 之前；域名流量不在本地解析。其余流量按专用规则或 `默认代理` 转发。模板启用 HTTP / TLS / QUIC 嗅探（`parse-pure-ip`，不改写目的地址），自带 DoH 或直连 IP 的应用也按真实域名分流；Voyra 同步不写入 `sniffer`，保留其现有设置。
+国内 AI、原有 Loyalsoldier 和 `GEOSITE,cn` 国内域名、局域网域名和私有网段走直连。没有可识别域名、目标属于中国大陆网段（`cncidr`，`no-resolve`）的纯 IP 连接也直连，规则位于全部 AI 与代理规则之后、`MATCH` 之前；域名流量不在本地解析。其余流量按专用规则或 `默认代理` 转发。模板启用 HTTP / TLS / QUIC 嗅探（`parse-pure-ip`），自带 DoH 或直连 IP 的应用也按真实域名分流；2026-11-20 起开启 `override-destination`，绕过内核 DNS、拿到被污染 IP 的应用（如手机上经局域网 DNS 解析的浏览器）也按嗅探出的真实域名由节点远端解析连接，Apple 推送等固定 IP 服务在 `skip-domain` 中跳过；第二条规则拒绝没有映射的 fake-ip（`198.18.0.0/16`），内核重启后残留的 fake-ip 立即失败重试，不再被当作局域网地址直连超时；Voyra 同步不写入 `sniffer`，保留其现有设置。
 
 2026-11-18 起，Claude、Claude Code 与 Claude Desktop 的第三方依赖（Datadog / GrowthBook / Claude 的 Sentry 项目 / Statsig 遥测，hCaptcha / Turnstile / reCAPTCHA，Stripe、Intercom、Segment，安装更新与插件、Artifacts 资源、Bedrock / Vertex / Foundry、内置 MCP 连接器、文档站资源）在 `claude-deps` 中，紧随 Anthropic IP、先于 OpenAI 共享引导，路由与 DNS 均使用 `Claude 专用`，使登录、验证码、计费和遥测与 claude.ai 同一出口。共享主机按域名整体生效，ChatGPT 访问 Stripe、Intercom、Segment、Statsig、Turnstile 时同样使用 `Claude 专用`。WorkOS、Google 与 Microsoft 账号主机及 OpenAI 自己的 Sentry 项目不在该集合，仍按原规则。
 

@@ -302,7 +302,12 @@ class PolicyTest(unittest.TestCase):
         self.assertEqual((provider['type'], provider['behavior']), ('http', 'ipcidr'))
         sniffer = self.template['sniffer']
         self.assertTrue(sniffer['enable'] and sniffer['parse-pure-ip'])
-        self.assertFalse(sniffer['override-destination'])
+        # Apps that resolve outside the core get poisoned IPs; dial the sniffed domain instead.
+        self.assertTrue(sniffer['override-destination'])
+        self.assertIn('+.push.apple.com', sniffer['skip-domain'])
+        self.assertEqual(self.template['dns']['fake-ip-range'], '198.18.0.1/16')
+        self.assertEqual(self.template['rules'][1], 'IP-CIDR,198.18.0.0/16,REJECT,no-resolve')
+        self.assertLess(1, self.template['rules'].index('RULE-SET,lancidr,DIRECT,no-resolve'))
         self.assertEqual(set(sniffer['sniff']), {'HTTP', 'TLS', 'QUIC'})
 
     def test_gemini_and_antigravity_share_a_dedicated_group_for_routes_dns_and_processes(self):
