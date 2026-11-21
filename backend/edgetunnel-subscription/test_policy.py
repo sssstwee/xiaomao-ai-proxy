@@ -328,6 +328,11 @@ class PolicyTest(unittest.TestCase):
         self.assertIn('+.push.apple.com', sniffer['skip-domain'])
         self.assertEqual(self.template['dns']['fake-ip-range'], '198.18.0.1/16')
         self.assertEqual(self.template['rules'][0], 'IP-CIDR,198.18.0.0/16,REJECT,no-resolve')
+        self.assertEqual(self.template['rules'][1], 'DOMAIN,play.googleapis.com,REJECT')
+        self.assertLess(self.template['rules'].index('DOMAIN,play.googleapis.com,REJECT'),
+                        self.template['rules'].index('RULE-SET,google,Gemini 专用,no-resolve'))
+        self.assertLess(self.template['rules'].index('DOMAIN,play.googleapis.com,REJECT'),
+                        self.template['rules'].index('RULE-SET,ai-shared,故障转移,no-resolve'))
         self.assertLess(0, self.template['rules'].index('RULE-SET,lancidr,DIRECT,no-resolve'))
         self.assertEqual(set(sniffer['sniff']), {'HTTP', 'TLS', 'QUIC'})
 

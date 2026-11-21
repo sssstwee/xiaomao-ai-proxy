@@ -64,6 +64,8 @@ proxy-groups:
 rules:
   # A fake-ip without a live mapping (cached across a core restart) fails fast instead of timing out as a LAN address.
   - IP-CIDR,198.18.0.0/16,REJECT,no-resolve
+  # Block Antigravity background telemetry uploads and retry loops to play.googleapis.com.
+  - DOMAIN,play.googleapis.com,REJECT
   - RULE-SET,cn-ai-extra,DIRECT
   - AND,((NETWORK,UDP),(RULE-SET,anthropic-bootstrap)),REJECT
   - RULE-SET,anthropic-bootstrap,Claude 专用,no-resolve
