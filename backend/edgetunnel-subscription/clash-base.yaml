@@ -32,7 +32,7 @@ proxy-groups:
     icon: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/icons/Claude.png
     type: fallback
     url: https://api.anthropic.com/v1/models
-    interval: 600
+    interval: 1800
     lazy: true
     timeout: 5000
     max-failed-times: 3
@@ -43,7 +43,7 @@ proxy-groups:
     icon: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/icons/ChatGPT.png
     type: fallback
     url: https://api.openai.com/v1/models
-    interval: 600
+    interval: 1800
     lazy: true
     timeout: 5000
     max-failed-times: 3
@@ -54,7 +54,7 @@ proxy-groups:
     icon: https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/icons/Gemini.png
     type: fallback
     url: https://generativelanguage.googleapis.com/v1beta/models
-    interval: 600
+    interval: 1800
     lazy: true
     timeout: 5000
     max-failed-times: 3
@@ -62,7 +62,6 @@ proxy-groups:
     include-all-proxies: true
     exclude-filter: (?i)warp|^cf-tcp-backup$|^普通| · 普通$
 rules:
-  - AND,((NETWORK,UDP),(DST-PORT,443)),REJECT
   # A fake-ip without a live mapping (cached across a core restart) fails fast instead of timing out as a LAN address.
   - IP-CIDR,198.18.0.0/16,REJECT,no-resolve
   - RULE-SET,cn-ai-extra,DIRECT
@@ -100,15 +99,21 @@ rules:
   - RULE-SET,artifact-resources,故障转移,no-resolve
   - RULE-SET,private,DIRECT
   - RULE-SET,lancidr,DIRECT,no-resolve
+  - AND,((NETWORK,UDP),(RULE-SET,line)),REJECT
   - RULE-SET,line,默认代理
+  - AND,((NETWORK,UDP),(RULE-SET,line-ip)),REJECT
   - RULE-SET,line-ip,默认代理,no-resolve
   - RULE-SET,ai-cn,DIRECT
   - AND,((NETWORK,UDP),(RULE-SET,ai)),REJECT
   - RULE-SET,ai,故障转移
   - RULE-SET,reject,REJECT
+  - AND,((NETWORK,UDP),(RULE-SET,tld-not-cn)),REJECT
   - RULE-SET,tld-not-cn,默认代理
+  - AND,((NETWORK,UDP),(RULE-SET,gfw)),REJECT
   - RULE-SET,gfw,默认代理
+  - AND,((NETWORK,UDP),(RULE-SET,telegramcidr)),REJECT
   - RULE-SET,telegramcidr,默认代理,no-resolve
+  - AND,((NETWORK,UDP),(RULE-SET,proxy)),REJECT
   - RULE-SET,proxy,默认代理
   - AND,((NETWORK,TCP),(DOMAIN,perfops2.byte-test.com)),默认代理
   - RULE-SET,direct,DIRECT

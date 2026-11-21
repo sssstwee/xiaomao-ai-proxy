@@ -65,7 +65,7 @@ class PolicyTest(unittest.TestCase):
             self.assertEqual((groups[name]['interval'], groups[name]['timeout'], groups[name]['lazy'], groups[name]['max-failed-times']), (300, 5000, True, 3))
         self.assertEqual(groups['自动选择']['tolerance'], 100)
         for name in AI_GROUPS:
-            self.assertEqual((groups[name]['interval'], groups[name]['timeout'], groups[name]['lazy'], groups[name]['max-failed-times']), (600, 5000, True, 3))
+            self.assertEqual((groups[name]['interval'], groups[name]['timeout'], groups[name]['lazy'], groups[name]['max-failed-times']), (1800, 5000, True, 3))
 
     def test_ai_bootstrap_precedes_general_proxy_and_domestic_rules(self):
         rules = self.template['rules']
@@ -80,7 +80,7 @@ class PolicyTest(unittest.TestCase):
             'RULE-SET,cncidr,DIRECT,no-resolve',
         ])
         self.assertEqual(rules[-2:], ['MATCH,默认代理', 'NETWORK,UDP,REJECT'])
-        self.assertEqual(rules[0], 'AND,((NETWORK,UDP),(DST-PORT,443)),REJECT')
+        self.assertNotIn(SYNC.QUIC_REJECT, rules)
         providers = self.template['rule-providers']
         self.assertIn('anthropic.auth0.com', providers['anthropic-bootstrap']['payload'])
         self.assertIn('+.oaistatsig.com', providers['openai-bootstrap']['payload'])
@@ -88,6 +88,18 @@ class PolicyTest(unittest.TestCase):
         self.assertGreater(len(providers['openai-voice']['payload']), 100)
         for group, key in [('Claude 专用', 'rule-set:anthropic-bootstrap,anthropic'), ('ChatGPT 专用', 'rule-set:openai-bootstrap,openai')]:
             self.assertTrue(all(server.endswith('#' + group) for server in self.template['dns']['nameserver-policy'][key]))
+
+    def test_udp_cannot_skip_a_proxy_rule_into_a_direct_rule(self):
+        # Workers nodes carry no UDP, so Mihomo skips their rules for UDP; each proxied rule needs a UDP rejection.
+        rules = self.template['rules']
+        for index, rule in enumerate(rules[:-2]):
+            match, _, target = rule.removesuffix(',no-resolve').rpartition(',')
+            if target in ['REJECT', 'DIRECT'] or match.startswith('AND,((NETWORK,TCP)') or match.startswith('PROCESS-'):
+                continue
+            self.assertEqual(rules[index - 1], f'AND,((NETWORK,UDP),({match})),REJECT', rule)
+        first_direct = min(index for index, rule in enumerate(rules) if rule.endswith(',DIRECT') or rule.endswith(',DIRECT,no-resolve'))
+        self.assertFalse(any('DST-PORT,443' in rule for rule in rules[:first_direct]))
+        self.assertEqual(rules[-2:], ['MATCH,默认代理', 'NETWORK,UDP,REJECT'])
 
     def test_voyra_quic_uses_only_verified_hysteria_nodes_with_reject_fallback(self):
         self.current['sub-rules'] = None
@@ -101,7 +113,7 @@ class PolicyTest(unittest.TestCase):
         self.assertEqual(config['rules'][:2], [
             'SUB-RULE,(AND,((NETWORK,UDP),(DST-PORT,443))),voyra-quic', SYNC.QUIC_REJECT,
         ])
-        self.assertEqual(config['rules'][1:], self.template['rules'])
+        self.assertEqual(config['rules'][2:], self.template['rules'])
         rules = config['sub-rules']['voyra-quic']
         self.assertIn('RULE-SET,google,REJECT,no-resolve', rules)
         self.assertIn('RULE-SET,lancidr,REJECT,no-resolve', rules)
@@ -127,7 +139,8 @@ class PolicyTest(unittest.TestCase):
             self.assertNotIn(f'AND,((NETWORK,UDP),(RULE-SET,{provider})),REJECT', rules[:position])
             self.assertLess(position, rules.index('GEOSITE,cn,REJECT'))
         baseline = SYNC.render(self.current, self.template)
-        self.assertEqual(config['rules'][1:], baseline['rules'])
+        self.assertEqual(config['rules'][:2], ['SUB-RULE,(AND,((NETWORK,UDP),(DST-PORT,443))),voyra-quic', SYNC.QUIC_REJECT])
+        self.assertEqual(config['rules'][2:], baseline['rules'])
         self.assertEqual(config['proxy-groups'][:-1], baseline['proxy-groups'])
         self.assertEqual(config['dns'], baseline['dns'])
 
@@ -306,8 +319,8 @@ class PolicyTest(unittest.TestCase):
         self.assertTrue(sniffer['override-destination'])
         self.assertIn('+.push.apple.com', sniffer['skip-domain'])
         self.assertEqual(self.template['dns']['fake-ip-range'], '198.18.0.1/16')
-        self.assertEqual(self.template['rules'][1], 'IP-CIDR,198.18.0.0/16,REJECT,no-resolve')
-        self.assertLess(1, self.template['rules'].index('RULE-SET,lancidr,DIRECT,no-resolve'))
+        self.assertEqual(self.template['rules'][0], 'IP-CIDR,198.18.0.0/16,REJECT,no-resolve')
+        self.assertLess(0, self.template['rules'].index('RULE-SET,lancidr,DIRECT,no-resolve'))
         self.assertEqual(set(sniffer['sniff']), {'HTTP', 'TLS', 'QUIC'})
 
     def test_gemini_and_antigravity_share_a_dedicated_group_for_routes_dns_and_processes(self):

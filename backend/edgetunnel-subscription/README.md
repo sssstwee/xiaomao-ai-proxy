@@ -2,7 +2,7 @@
 
 `acl4ssr.ini` 通过 subconverter 原生 `clash_rule_base` 加载 `clash-base.yaml`。**分组、图标、服务探活、规则集、AI 分流、DNS 和 UDP 防直连规则统一维护在 `clash-base.yaml`。** INI 关闭规则生成与覆盖，EdgeTunnel 的内置转换按模板合并最终配置；模板中的 `include-all-proxies` 由转换层解析为本次订阅的显式成员列表，保留原节点顺序，并完整保留图标及 Mihomo 专有字段。
 
-`默认代理`（select）包含 `自动选择`（url-test，300 秒，100ms 容差）和 `故障转移`（fallback，按订阅顺序选择健康节点，300 秒）。2026-11-11 起移除 `负载均衡`（round-robin），健康检查统一为 timeout 5000、lazy true、max-failed-times 3，以减少对 Worker 的探活请求。已保存的手动选择需在客户端切换。`Claude 专用`、`ChatGPT 专用` 和 `Gemini 专用` 各自使用 fallback（600 秒）。图标采用固定版本的 Qure：默认代理为蓝色箭头，自动选择为黄色闪电，故障转移为绿色心跳，文件镜像在自有资源仓库。三个 AI 组排除 WARP、`cf-tcp-backup` 和 `普通` 标识节点：Voyra 保持 VPS 原生出口，EdgeTunnel 继续使用自己的节点，两者不复制节点凭据。
+`默认代理`（select）包含 `自动选择`（url-test，300 秒，100ms 容差）和 `故障转移`（fallback，按订阅顺序选择健康节点，300 秒）。2026-11-11 起移除 `负载均衡`（round-robin），健康检查统一为 timeout 5000、lazy true、max-failed-times 3，以减少对 Worker 的探活请求。已保存的手动选择需在客户端切换。`Claude 专用`、`ChatGPT 专用` 和 `Gemini 专用` 各自使用 fallback（1800 秒；2026-11-21 起由 600 秒放宽，16 个节点的三组探活从每天约 6,900 次降到约 2,300 次 Worker 请求）。图标采用固定版本的 Qure：默认代理为蓝色箭头，自动选择为黄色闪电，故障转移为绿色心跳，文件镜像在自有资源仓库。三个 AI 组排除 WARP、`cf-tcp-backup` 和 `普通` 标识节点：Voyra 保持 VPS 原生出口，EdgeTunnel 继续使用自己的节点，两者不复制节点凭据。
 
 Claude / OpenAI 分别使用 MetaCubeX 的每日更新域名规则，并内联已审查的主站、认证、CDN、功能开关和资源域名作为首次启动保障。Claude 专属 Auth0 先于 OpenAI 共用认证；同时保留 Anthropic 官方入站 IP、OpenAI 语音网段和 Artifacts 资源。Voice 网段来自 [OpenAI 官方 JSON](https://openai.com/chatgpt-voice.json)，同步脚本及定制 Worker 刷新时读取自有仓库的 JSON 镜像，失败保留模板快照。
 
@@ -10,7 +10,7 @@ Claude、OpenAI 的核心域名与 DNS 分别进入各自的独立 fallback，�
 
 2026-11-15 参考 JMS 的 11 月 14 日 AI 覆盖补充：内联 Gemini、Meta 引导域名，以及 Claude 第三方依赖和海外 AI 补充清单的去重并集（207 条）。包含 DeepL / Lara / Yandex、character.ai、Replicate、Runway、v0、Bolt、Lovable、Suno、Together、Fireworks、DeepInfra、LMArena 等。共享依赖按域名进入“故障转移”，不将 JMS 的美国节点编号或客户端进程策略复制到模板。Google 共享域、Gemini、Twitter 与 Bing 均使用与 JMS 相同的成熟 MetaCubeX 清单，镜像到资源仓库并每日更新。国内 AI 显式例外在最前；固定 AI 主站与依赖先于宽泛国内 AI、应用、广告和国内地址规则，DNS 采用相同优先级。
 
-2026-11-20 起，Gemini / Antigravity / NotebookLM / AI Studio / Jules 的内联引导域名（`gemini-bootstrap`）、MetaCubeX `google-gemini` 清单以及 Google 共享域（`google`，含账号登录、YouTube 等）的路由与 DNS 统一使用 `Gemini 专用`（fallback，600 秒，探活 `generativelanguage.googleapis.com/v1beta/models`；Mihomo 以 HEAD 探活，无密钥时返回 404，GET 返回 403，均视为可达），使 Gemini 与其登录、静态资源同一出口。`find-process-mode` 改为 `strict`；在国内与局域网直连规则之后、`MATCH` 之前，Antigravity 应用（macOS `/Applications/Antigravity.app/`、Windows `Programs\Antigravity\`）及名为 `gemini` 的进程未被域名规则命中的流量也进入 `Gemini 专用`。Gemini CLI 以 `node` 运行时不匹配进程规则，依赖上述域名规则。Voyra 的 QUIC 子规则对这些流量继续 REJECT。
+2026-11-20 起，Gemini / Antigravity / NotebookLM / AI Studio / Jules 的内联引导域名（`gemini-bootstrap`）、MetaCubeX `google-gemini` 清单以及 Google 共享域（`google`，含账号登录、YouTube 等）的路由与 DNS 统一使用 `Gemini 专用`（fallback，1800 秒，探活 `generativelanguage.googleapis.com/v1beta/models`；Mihomo 以 HEAD 探活，无密钥时返回 404，GET 返回 403，均视为可达），使 Gemini 与其登录、静态资源同一出口。`find-process-mode` 改为 `strict`；在国内与局域网直连规则之后、`MATCH` 之前，Antigravity 应用（macOS `/Applications/Antigravity.app/`、Windows `Programs\Antigravity\`）及名为 `gemini` 的进程未被域名规则命中的流量也进入 `Gemini 专用`。Gemini CLI 以 `node` 运行时不匹配进程规则，依赖上述域名规则。Voyra 的 QUIC 子规则对这些流量继续 REJECT。
 
 2026-11-20 起，Loyalsoldier `reject` 广告与追踪清单由 `默认代理` 改为 `REJECT`，不再把广告请求转发到节点、消耗 Worker 请求额度；它位于全部 AI、Claude 依赖、Google / Gemini 和国内 AI 规则之后，这些服务自身依赖的统计主机（如 Segment、Google Analytics）仍按其原分组放行，DNS 策略也不再为该清单使用代理 DoH。18 个 domain / ipcidr 远程规则集改用资源仓库每日编译的 Mihomo 二进制格式（`.mrs`），降低客户端内存和加载时间；`line-ip` 为 classical 规则，保持 YAML。
 
@@ -18,7 +18,7 @@ Claude、OpenAI 的核心域名与 DNS 分别进入各自的独立 fallback，�
 
 2026-11-18 起，Claude、Claude Code 与 Claude Desktop 的第三方依赖（Datadog / GrowthBook / Claude 的 Sentry 项目 / Statsig 遥测，hCaptcha / Turnstile / reCAPTCHA，Stripe、Intercom、Segment，安装更新与插件、Artifacts 资源、Bedrock / Vertex / Foundry、内置 MCP 连接器、文档站资源）在 `claude-deps` 中，紧随 Anthropic IP、先于 OpenAI 共享引导，路由与 DNS 均使用 `Claude 专用`，使登录、验证码、计费和遥测与 claude.ai 同一出口。共享主机按域名整体生效，ChatGPT 访问 Stripe、Intercom、Segment、Statsig、Turnstile 时同样使用 `Claude 专用`。WorkOS、Google 与 Microsoft 账号主机及 OpenAI 自己的 Sentry 项目不在该集合，仍按原规则。
 
-Claude 和 ChatGPT 的核心域名通过各自的代理组查询 Cloudflare DoH。普通海外流量和公共依赖使用各自代理组中的 Cloudflare 或 Google DoH。国内域名使用国内 DoH，局域网域名沿用系统 DNS。`proxy-server-nameserver` 负责解析节点域名。模板启用 IPv6 TUN，DNS 保留原 IPv4 解析设置。EdgeTunnel 拦截 UDP/443，使支持回落的客户端改走 TCP。默认代理无法承载的其他 UDP 请求也会被拦截。
+Claude 和 ChatGPT 的核心域名通过各自的代理组查询 Cloudflare DoH。普通海外流量和公共依赖使用各自代理组中的 Cloudflare 或 Google DoH。国内域名使用国内 DoH，局域网域名沿用系统 DNS。`proxy-server-nameserver` 负责解析节点域名。模板启用 IPv6 TUN，DNS 保留原 IPv4 解析设置。EdgeTunnel 节点不承载 UDP，Mihomo 会跳过以它们为目标的规则，因此每条代理规则前都有同条件的 UDP `REJECT`：海外 QUIC 被拦截，支持回落的客户端改走 TCP；同时收录于代理清单和国内清单的域名，UDP 也不会越过代理规则落入直连。2026-11-21 起取消开头的全局 UDP/443 拦截，国内直连域名和中国大陆 IP 的 QUIC 直接放行；其余无法承载的 UDP 由末尾的 `NETWORK,UDP,REJECT` 拦截。
 
 EdgeTunnel 按用户最新要求，仅保留原 AI 组的十六条 `洛杉矶NN · AI`（`/proxyip-only=`）节点，移除原十条普通节点。普通故障转移、自动选择与 Claude / ChatGPT 专用组共用这些节点；两个 AI 组仍为独立 fallback，AI 规则、DNS 与 UDP/443 防直连策略保持原样。普通组两个探活地址使用支持 HEAD 的 `https://cp.cloudflare.com/generate_204`（预期 204），严格路径不在 Worker 本地合成测速响应；API 专用组继续使用各自 API 探活。判断探活还须核对对应 URL 的 `extra.alive` 与响应状态，不能只检查返回 delay。Cloudflare trace 仅用 GET 做独立出口核验。严格路径此前对 Google / YouTube 及部分公共资源出现 TLS 失败，共用节点不代表通用网站兼容性已解决，也不承诺 ≤250ms。Voyra 的普通组成员不变；共享探活地址已单独验证其现有六条节点。
 
