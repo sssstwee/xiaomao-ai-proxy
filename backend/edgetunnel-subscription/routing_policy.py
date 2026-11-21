@@ -70,8 +70,6 @@ def render(current, template, quic_nodes=()):
             del result['sub-rules']
     verified = [name for name in order if name in quic_nodes and nodes[name]['type'] == 'hysteria2']
     if verified:
-        if result['rules'][0] != QUIC_REJECT:
-            raise ValueError('Missing initial QUIC rejection rule')
         balance = next(group for group in result['proxy-groups'] if group['name'] == '自动选择')
         quic_group = {key: value for key, value in balance.items() if key != 'tolerance'}
         result['proxy-groups'].append({**quic_group, 'name': QUIC_GROUP, 'icon': QUIC_ICON, 'type': 'load-balance',
@@ -80,20 +78,22 @@ def render(current, template, quic_nodes=()):
                      if group['name'] in ['Claude 专用', 'ChatGPT 专用']
                      and AI_QUIC_NODE in verified and AI_QUIC_NODE in group['proxies']}
         quic_rules = []
-        for rule in result['rules'][1:]:
+        for rule in result['rules']:
             match, _, target = rule.removesuffix(',no-resolve').rpartition(',')
             quic_target = QUIC_GROUP if target == '默认代理' else 'REJECT'
             params = ',no-resolve' if rule.endswith(',no-resolve') else ''
+            # Drop the template's UDP guard where Voyra has a QUIC-capable target for that match.
+            udp_guard = f'AND,((NETWORK,UDP),({match})),REJECT'
+            if (target in ai_groups or quic_target == QUIC_GROUP) and quic_rules and quic_rules[-1] == udp_guard:
+                quic_rules.pop()
             if target in ai_groups:
-                udp_guard = f'AND,((NETWORK,UDP),({match})),REJECT'
-                if quic_rules and quic_rules[-1] == udp_guard:
-                    quic_rules.pop()
                 quic_rules.append(f'{match},{AI_QUIC_NODE}{params}')
             # Keep a service-specific rejection after AI allow rules if UDP skips the node.
             quic_rules.append(f'{match},{quic_target}{params}')
         sub_rules[QUIC_RULES] = quic_rules
         result['sub-rules'] = sub_rules
-        result['rules'].insert(0, f'SUB-RULE,({QUIC_MATCH}),{QUIC_RULES}')
+        # The hosted template lets domestic QUIC through; Voyra keeps QUIC limited to its verified nodes.
+        result['rules'][:0] = [f'SUB-RULE,({QUIC_MATCH}),{QUIC_RULES}', QUIC_REJECT]
     result['harmony-runtime'] = current.get('harmony-runtime', {})
     return result
 
