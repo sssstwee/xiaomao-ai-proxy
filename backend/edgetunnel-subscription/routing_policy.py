@@ -48,6 +48,8 @@ def render(current, template, quic_nodes=()):
     for key in ['geox-url', 'geodata-mode', 'geo-auto-update', 'geo-update-interval']:
         if key in template:
             result[key] = copy.deepcopy(template[key])
+        else:
+            result.pop(key, None)
     nodes = {node['name']: node for node in current['proxies']}
     old_default = next((rule.split(',')[1] for rule in reversed(current.get('rules', [])) if rule.startswith(('MATCH,', 'FINAL,'))), '')
     old_group = next((group for group in (current.get('proxy-groups') or []) if group['name'] == old_default), {})
@@ -112,7 +114,7 @@ def main():
     raw = download(args.template) if args.template.startswith('https://') else Path(args.template).read_bytes()
     template = yaml.safe_load(raw)
     voice = template.get('rule-providers', {}).get('openai-voice')
-    if voice:
+    if voice and voice.get('type') == 'inline':
         try:
             document = json.loads(download(VOICE_SOURCE))
             prefixes = [entry[key] for entry in document['prefixes'] for key in ['ipv4Prefix', 'ipv6Prefix'] if key in entry]

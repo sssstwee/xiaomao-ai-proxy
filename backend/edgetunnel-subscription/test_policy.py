@@ -55,17 +55,17 @@ class PolicyTest(unittest.TestCase):
         config = SYNC.render(self.current, self.template)
         groups = {group['name']: group for group in config['proxy-groups']}
         self.assertEqual(groups['默认代理']['type'], 'select')
-        self.assertEqual(groups['默认代理']['proxies'], ['自动选择', '故障转移'])
+        self.assertEqual(groups['默认代理']['proxies'], ['故障转移', '自动选择'])
         self.assertEqual(groups['故障转移']['type'], 'fallback')
         self.assertEqual(groups['故障转移']['proxies'], [node['name'] for node in config['proxies']])
         self.assertNotIn('负载均衡', groups)
         self.assertEqual(groups['自动选择']['type'], 'url-test')
         self.assertEqual(groups['自动选择']['proxies'], groups['故障转移']['proxies'])
         for name in ['故障转移', '自动选择']:
-            self.assertEqual((groups[name]['interval'], groups[name]['timeout'], groups[name]['lazy'], groups[name]['max-failed-times']), (300, 5000, True, 3))
+            self.assertEqual((groups[name]['interval'], groups[name]['timeout'], groups[name]['lazy'], groups[name]['max-failed-times']), (300, 5000, True, 2))
         self.assertEqual(groups['自动选择']['tolerance'], 100)
         for name in AI_GROUPS:
-            self.assertEqual((groups[name]['interval'], groups[name]['timeout'], groups[name]['lazy'], groups[name]['max-failed-times']), (1800, 5000, True, 3))
+            self.assertEqual((groups[name]['interval'], groups[name]['timeout'], groups[name]['lazy'], groups[name]['max-failed-times']), (600, 5000, True, 2))
 
     def test_ai_bootstrap_precedes_general_proxy_and_domestic_rules(self):
         rules = self.template['rules']
@@ -73,10 +73,10 @@ class PolicyTest(unittest.TestCase):
         chatgpt = 'RULE-SET,openai-bootstrap,ChatGPT 专用,no-resolve'
         self.assertLess(rules.index(claude), rules.index(chatgpt))
         self.assertLess(rules.index(chatgpt), rules.index('RULE-SET,reject,REJECT'))
-        self.assertLess(rules.index(chatgpt), rules.index('GEOSITE,cn,DIRECT'))
+        self.assertLess(rules.index(chatgpt), rules.index('RULE-SET,cn,DIRECT'))
         self.assertEqual([rule for rule in rules if ',DIRECT' in rule], [
             'RULE-SET,cn-ai-extra,DIRECT', 'RULE-SET,private,DIRECT', 'RULE-SET,lancidr,DIRECT,no-resolve',
-            'RULE-SET,ai-cn,DIRECT', 'RULE-SET,cn-push,DIRECT', 'RULE-SET,direct,DIRECT', 'GEOSITE,cn,DIRECT',
+            'RULE-SET,ai-cn,DIRECT', 'RULE-SET,cn-push,DIRECT', 'RULE-SET,direct,DIRECT', 'RULE-SET,cn,DIRECT',
             'RULE-SET,cncidr,DIRECT,no-resolve',
         ])
         self.assertEqual(rules[-2:], ['MATCH,默认代理', 'NETWORK,UDP,REJECT'])
@@ -85,7 +85,9 @@ class PolicyTest(unittest.TestCase):
         self.assertIn('anthropic.auth0.com', providers['anthropic-bootstrap']['payload'])
         self.assertIn('+.oaistatsig.com', providers['openai-bootstrap']['payload'])
         self.assertIn('+.featuregates.org', providers['openai-bootstrap']['payload'])
-        self.assertGreater(len(providers['openai-voice']['payload']), 100)
+        self.assertEqual((providers['openai-voice']['type'], providers['openai-voice']['format'], providers['openai-voice']['behavior']), ('http', 'mrs', 'ipcidr'))
+        self.assertNotIn('ai-resources', providers)
+        self.assertNotIn('artifact-resources', providers)
         for group, key in [('Claude 专用', 'rule-set:anthropic-bootstrap,anthropic'), ('ChatGPT 专用', 'rule-set:openai-bootstrap,openai')]:
             self.assertTrue(all(server.endswith('#' + group) for server in self.template['dns']['nameserver-policy'][key]))
 
@@ -94,7 +96,7 @@ class PolicyTest(unittest.TestCase):
         rules = self.template['rules']
         for index, rule in enumerate(rules[:-2]):
             match, _, target = rule.removesuffix(',no-resolve').rpartition(',')
-            if target in ['REJECT', 'DIRECT'] or match.startswith('AND,((NETWORK,TCP)') or match.startswith('PROCESS-'):
+            if target in ['REJECT', 'DIRECT'] or match.startswith('AND,((NETWORK,TCP)'):
                 continue
             self.assertEqual(rules[index - 1], f'AND,((NETWORK,UDP),({match})),REJECT', rule)
         first_direct = min(index for index, rule in enumerate(rules) if rule.endswith(',DIRECT') or rule.endswith(',DIRECT,no-resolve'))
@@ -108,14 +110,14 @@ class PolicyTest(unittest.TestCase):
         self.assertLess(index['RULE-SET,google,Gemini 专用,no-resolve'], index['RULE-SET,ai-shared,故障转移,no-resolve'])
         self.assertLess(index['RULE-SET,gemini,Gemini 专用,no-resolve'], index['RULE-SET,google,Gemini 专用,no-resolve'])
         self.assertLess(index['RULE-SET,direct,DIRECT'], index['RULE-SET,tld-not-cn,默认代理'])
-        self.assertLess(index['RULE-SET,tld-not-cn,默认代理'], index['GEOSITE,cn,DIRECT'])
+        self.assertLess(index['RULE-SET,tld-not-cn,默认代理'], index['RULE-SET,cn,DIRECT'])
         self.assertLess(index['RULE-SET,cn-push,DIRECT'], index['RULE-SET,reject,REJECT'])
         providers = self.template['rule-providers']
         self.assertTrue({'+.getui.com', '+.jpush.cn', 'msg.umengcloud.com'} <= set(providers['cn-push']['payload']))
         self.assertTrue({'+.ampcode.com', '+.warp.dev', '+.t3.chat', '+.anysphere.co'} <= set(providers['ai-shared']['payload']))
         self.assertIn('+.geminicli.com', providers['gemini-bootstrap']['payload'])
         policy = list(self.template['dns']['nameserver-policy'])
-        self.assertLess(policy.index('rule-set:tld-not-cn'), policy.index('geosite:cn'))
+        self.assertLess(policy.index('rule-set:tld-not-cn'), policy.index('rule-set:cn'))
         self.assertLess(policy.index('rule-set:cn-push,direct'), policy.index('rule-set:tld-not-cn'))
 
     def test_voyra_quic_uses_only_verified_hysteria_nodes_with_reject_fallback(self):
@@ -134,7 +136,7 @@ class PolicyTest(unittest.TestCase):
         rules = config['sub-rules']['voyra-quic']
         self.assertIn('RULE-SET,google,REJECT,no-resolve', rules)
         self.assertIn('RULE-SET,lancidr,REJECT,no-resolve', rules)
-        self.assertIn('GEOSITE,cn,REJECT', rules)
+        self.assertIn('RULE-SET,cn,REJECT', rules)
         self.assertEqual(rules[-2:], ['MATCH,Voyra QUIC', 'NETWORK,UDP,REJECT'])
         self.assertIn('RULE-SET,anthropic-bootstrap,REJECT,no-resolve', rules)
         self.assertIn('RULE-SET,openai-bootstrap,REJECT,no-resolve', rules)
@@ -154,7 +156,7 @@ class PolicyTest(unittest.TestCase):
             position = rules.index(allowed)
             self.assertEqual(rules[position + 1], rejected)
             self.assertNotIn(f'AND,((NETWORK,UDP),(RULE-SET,{provider})),REJECT', rules[:position])
-            self.assertLess(position, rules.index('GEOSITE,cn,REJECT'))
+            self.assertLess(position, rules.index('RULE-SET,cn,REJECT'))
         baseline = SYNC.render(self.current, self.template)
         self.assertEqual(config['rules'][:2], ['SUB-RULE,(AND,((NETWORK,UDP),(DST-PORT,443))),voyra-quic', SYNC.QUIC_REJECT])
         self.assertEqual(config['rules'][2:], baseline['rules'])
@@ -184,8 +186,6 @@ class PolicyTest(unittest.TestCase):
             'openai': 'ChatGPT 专用',
             'openai-voice': 'ChatGPT 专用',
             'ai': '故障转移',
-            'artifact-resources': '故障转移',
-            'ai-resources': '故障转移',
             'gemini-bootstrap': 'Gemini 专用',
             'meta-bootstrap': '故障转移',
             'ai-shared': '故障转移',
@@ -224,7 +224,7 @@ class PolicyTest(unittest.TestCase):
                     if provider in expected:
                         self.assertTrue(all(server.endswith('#' + expected[provider]) for server in servers), key)
                         self.assertTrue(all(not reaches_balance(server.rsplit('#', 1)[-1]) for server in servers), key)
-            self.assertEqual(groups['默认代理']['proxies'], ['自动选择', '故障转移'])
+            self.assertEqual(groups['默认代理']['proxies'], ['故障转移', '自动选择'])
 
     def test_edgetunnel_ordinary_groups_reuse_strict_ai_pool(self):
         self.current['proxies'] = [
@@ -237,20 +237,12 @@ class PolicyTest(unittest.TestCase):
         groups = {group['name']: group for group in config['proxy-groups']}
         for name in AI_GROUPS:
             self.assertEqual(groups[name]['proxies'], ['192.0.2.1 洛杉矶 · AI', '192.0.2.2 洛杉矶 · AI'])
-            if name == 'Gemini 专用':
-                continue
-            self.assertNotIn('dns.google', str(config['dns']['nameserver-policy'][
-                'rule-set:anthropic-bootstrap,anthropic' if name == 'Claude 专用'
-                else 'rule-set:openai-bootstrap,openai']))
         for name in ['故障转移', '自动选择']:
             self.assertEqual(groups[name]['proxies'], ['192.0.2.1 洛杉矶 · AI', '192.0.2.2 洛杉矶 · AI'])
             self.assertEqual(groups[name]['url'], 'https://cp.cloudflare.com/generate_204')
             self.assertEqual(groups[name]['expected-status'], '204')
-        rules = config['rules']
-        self.assertLess(rules.index('RULE-SET,anthropic-bootstrap,Claude 专用,no-resolve'),
-                        rules.index('RULE-SET,ai-resources,故障转移,no-resolve'))
-        self.assertIn('openaiassets.blob.core.windows.net',
-                      config['rule-providers']['ai-resources']['payload'])
+        self.assertEqual(config['dns']['respect-rules'], False)
+        self.assertEqual(config['dns']['nameserver'], ['https://1.1.1.1/dns-query#默认代理', 'https://8.8.8.8/dns-query#默认代理'])
         self.current['proxies'] = self.current['proxies'][1::2]
         with self.assertRaises(ValueError):
             SYNC.render(self.current, self.template)
@@ -282,7 +274,7 @@ class PolicyTest(unittest.TestCase):
         raw = 'https://raw.githubusercontent.com/sssstwee/edgetunnel/main/resources/'
         providers = self.template['rule-providers'].values()
         remote = [provider for provider in providers if provider['type'] == 'http']
-        self.assertEqual(len(remote), 19)
+        self.assertEqual(len(remote), 21)
         for provider in remote:
             self.assertTrue(provider['url'].startswith(raw + 'rules/'))
             # Large domain / IP lists load as Mihomo binary rule sets; classical lists stay YAML.
@@ -290,16 +282,13 @@ class PolicyTest(unittest.TestCase):
             self.assertEqual(provider['format'], 'mrs' if binary else 'yaml', provider['url'])
             self.assertTrue(provider['url'].endswith('.mrs' if binary else '.yaml'), provider['url'])
             self.assertTrue(provider['path'].endswith('.mrs' if binary else '.yaml'), provider['path'])
-        self.assertEqual(sum(provider['format'] == 'mrs' for provider in remote), 18)
+        self.assertEqual(sum(provider['format'] == 'mrs' for provider in remote), 20)
         for group in self.template['proxy-groups']:
             self.assertTrue(group['icon'].startswith(raw + 'icons/'))
         self.assertEqual(SYNC.VOICE_SOURCE, raw + 'data/chatgpt-voice.json')
         config = SYNC.render(self.current, self.template)
-        self.assertEqual(set(config['geox-url']), {'geoip', 'geosite', 'mmdb', 'asn'})
-        for url in config['geox-url'].values():
-            self.assertTrue(url.startswith('https://github.com/sssstwee/edgetunnel/releases/latest/download/'))
         for key in ['geox-url', 'geodata-mode', 'geo-auto-update', 'geo-update-interval']:
-            self.assertEqual(config[key], self.template[key])
+            self.assertNotIn(key, config)
 
     def test_claude_dependencies_share_the_claude_group_ahead_of_shared_bootstraps(self):
         rules = self.template['rules']
@@ -326,8 +315,9 @@ class PolicyTest(unittest.TestCase):
         rules = self.template['rules']
         route = rules.index('RULE-SET,cncidr,DIRECT,no-resolve')
         # The foreign-TLD guess comes after every domestic list, just before domain-less CN addresses.
-        self.assertEqual(rules[route - 4:route], ['RULE-SET,direct,DIRECT', 'AND,((NETWORK,UDP),(RULE-SET,tld-not-cn)),REJECT', 'RULE-SET,tld-not-cn,默认代理', 'GEOSITE,cn,DIRECT'])
-        self.assertEqual(rules[route + 1:-2], PROCESS_RULES)
+        self.assertEqual(rules[route - 4:route], ['RULE-SET,direct,DIRECT', 'AND,((NETWORK,UDP),(RULE-SET,tld-not-cn)),REJECT', 'RULE-SET,tld-not-cn,默认代理', 'RULE-SET,cn,DIRECT'])
+        for rule in PROCESS_RULES:
+            self.assertIn(rule, rules[route + 1:-2])
         self.assertEqual(rules[-2:], ['MATCH,默认代理', 'NETWORK,UDP,REJECT'])
         provider = self.template['rule-providers']['cncidr']
         self.assertEqual((provider['type'], provider['behavior']), ('http', 'ipcidr'))
