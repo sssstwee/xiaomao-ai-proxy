@@ -76,7 +76,7 @@ class PolicyTest(unittest.TestCase):
         self.assertLess(rules.index(chatgpt), rules.index('GEOSITE,cn,DIRECT'))
         self.assertEqual([rule for rule in rules if ',DIRECT' in rule], [
             'RULE-SET,cn-ai-extra,DIRECT', 'RULE-SET,private,DIRECT', 'RULE-SET,lancidr,DIRECT,no-resolve',
-            'RULE-SET,ai-cn,DIRECT', 'RULE-SET,direct,DIRECT', 'GEOSITE,cn,DIRECT',
+            'RULE-SET,ai-cn,DIRECT', 'RULE-SET,cn-push,DIRECT', 'RULE-SET,direct,DIRECT', 'GEOSITE,cn,DIRECT',
             'RULE-SET,cncidr,DIRECT,no-resolve',
         ])
         self.assertEqual(rules[-2:], ['MATCH,默认代理', 'NETWORK,UDP,REJECT'])
@@ -100,6 +100,23 @@ class PolicyTest(unittest.TestCase):
         first_direct = min(index for index, rule in enumerate(rules) if rule.endswith(',DIRECT') or rule.endswith(',DIRECT,no-resolve'))
         self.assertFalse(any('DST-PORT,443' in rule for rule in rules[:first_direct]))
         self.assertEqual(rules[-2:], ['MATCH,默认代理', 'NETWORK,UDP,REJECT'])
+
+    def test_google_hosts_stay_on_gemini_and_domestic_lists_beat_guesses(self):
+        rules = self.template['rules']
+        index = {rule: position for position, rule in enumerate(rules)}
+        # The shared AI list carries broad Google suffixes; Google's own list must match first.
+        self.assertLess(index['RULE-SET,google,Gemini 专用,no-resolve'], index['RULE-SET,ai-shared,故障转移,no-resolve'])
+        self.assertLess(index['RULE-SET,gemini,Gemini 专用,no-resolve'], index['RULE-SET,google,Gemini 专用,no-resolve'])
+        self.assertLess(index['RULE-SET,direct,DIRECT'], index['RULE-SET,tld-not-cn,默认代理'])
+        self.assertLess(index['RULE-SET,tld-not-cn,默认代理'], index['GEOSITE,cn,DIRECT'])
+        self.assertLess(index['RULE-SET,cn-push,DIRECT'], index['RULE-SET,reject,REJECT'])
+        providers = self.template['rule-providers']
+        self.assertTrue({'+.getui.com', '+.jpush.cn', 'msg.umengcloud.com'} <= set(providers['cn-push']['payload']))
+        self.assertTrue({'+.ampcode.com', '+.warp.dev', '+.t3.chat', '+.anysphere.co'} <= set(providers['ai-shared']['payload']))
+        self.assertIn('+.geminicli.com', providers['gemini-bootstrap']['payload'])
+        policy = list(self.template['dns']['nameserver-policy'])
+        self.assertLess(policy.index('rule-set:tld-not-cn'), policy.index('geosite:cn'))
+        self.assertLess(policy.index('rule-set:cn-push,direct'), policy.index('rule-set:tld-not-cn'))
 
     def test_voyra_quic_uses_only_verified_hysteria_nodes_with_reject_fallback(self):
         self.current['sub-rules'] = None
@@ -308,7 +325,8 @@ class PolicyTest(unittest.TestCase):
     def test_domestic_addresses_without_a_domain_stay_direct_after_every_proxy_rule(self):
         rules = self.template['rules']
         route = rules.index('RULE-SET,cncidr,DIRECT,no-resolve')
-        self.assertEqual(rules[route - 1], 'GEOSITE,cn,DIRECT')
+        # The foreign-TLD guess comes after every domestic list, just before domain-less CN addresses.
+        self.assertEqual(rules[route - 4:route], ['RULE-SET,direct,DIRECT', 'AND,((NETWORK,UDP),(RULE-SET,tld-not-cn)),REJECT', 'RULE-SET,tld-not-cn,默认代理', 'GEOSITE,cn,DIRECT'])
         self.assertEqual(rules[route + 1:-2], PROCESS_RULES)
         self.assertEqual(rules[-2:], ['MATCH,默认代理', 'NETWORK,UDP,REJECT'])
         provider = self.template['rule-providers']['cncidr']

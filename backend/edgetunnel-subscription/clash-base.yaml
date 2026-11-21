@@ -85,14 +85,15 @@ rules:
   - RULE-SET,meta-bootstrap,故障转移,no-resolve
   - AND,((NETWORK,UDP),(RULE-SET,gemini)),REJECT
   - RULE-SET,gemini,Gemini 专用,no-resolve
+  # Google's own list wins over the shared AI list, so Google hosts stay on Gemini 专用.
+  - AND,((NETWORK,UDP),(RULE-SET,google)),REJECT
+  - RULE-SET,google,Gemini 专用,no-resolve
   - AND,((NETWORK,UDP),(RULE-SET,ai-shared)),REJECT
   - RULE-SET,ai-shared,故障转移,no-resolve
   - AND,((NETWORK,UDP),(RULE-SET,twitter-ai)),REJECT
   - RULE-SET,twitter-ai,故障转移,no-resolve
   - AND,((NETWORK,UDP),(RULE-SET,bing-ai)),REJECT
   - RULE-SET,bing-ai,故障转移,no-resolve
-  - AND,((NETWORK,UDP),(RULE-SET,google)),REJECT
-  - RULE-SET,google,Gemini 专用,no-resolve
   - AND,((NETWORK,UDP),(RULE-SET,ai-resources)),REJECT
   - RULE-SET,ai-resources,故障转移,no-resolve
   - AND,((NETWORK,UDP),(RULE-SET,artifact-resources)),REJECT
@@ -106,9 +107,9 @@ rules:
   - RULE-SET,ai-cn,DIRECT
   - AND,((NETWORK,UDP),(RULE-SET,ai)),REJECT
   - RULE-SET,ai,故障转移
+  # Domestic push SDKs sit in the ad list; apps need them for notifications.
+  - RULE-SET,cn-push,DIRECT
   - RULE-SET,reject,REJECT
-  - AND,((NETWORK,UDP),(RULE-SET,tld-not-cn)),REJECT
-  - RULE-SET,tld-not-cn,默认代理
   - AND,((NETWORK,UDP),(RULE-SET,gfw)),REJECT
   - RULE-SET,gfw,默认代理
   - AND,((NETWORK,UDP),(RULE-SET,telegramcidr)),REJECT
@@ -117,6 +118,9 @@ rules:
   - RULE-SET,proxy,默认代理
   - AND,((NETWORK,TCP),(DOMAIN,perfops2.byte-test.com)),默认代理
   - RULE-SET,direct,DIRECT
+  # Foreign TLDs are a fallback guess: the curated direct list wins, the broad GeoSite list does not.
+  - AND,((NETWORK,UDP),(RULE-SET,tld-not-cn)),REJECT
+  - RULE-SET,tld-not-cn,默认代理
   - GEOSITE,cn,DIRECT
   - RULE-SET,cncidr,DIRECT,no-resolve
   # Unlisted hosts from Antigravity and Gemini binaries; domestic and LAN traffic stays direct above.
@@ -903,6 +907,16 @@ rule-providers:
       - cdn.tailwindcss.com
       - code.jquery.com
       - unpkg.com
+  cn-push:
+    type: inline
+    behavior: domain
+    payload:
+      - +.getui.com
+      - +.getui.net
+      - +.igexin.com
+      - +.jpush.cn
+      - +.jpush.io
+      - msg.umengcloud.com
   cn-ai-extra:
     type: inline
     behavior: domain
@@ -987,6 +1001,7 @@ rule-providers:
       - oauthaccountmanager.googleapis.com
       - ssl.gstatic.com
       - lh3.googleusercontent.com
+      - +.geminicli.com
   meta-bootstrap:
     type: inline
     behavior: domain
@@ -1218,6 +1233,11 @@ rule-providers:
       - +.fal.media
       - +.civitai.com
       - +.openart.ai
+      - +.ampcode.com
+      - +.ampcode.app
+      - +.warp.dev
+      - +.t3.chat
+      - +.anysphere.co
   gemini:
     type: http
     behavior: domain
@@ -1305,12 +1325,15 @@ dns:
     rule-set:ai:
       - https://cloudflare-dns.com/dns-query#故障转移
       - https://dns.google/dns-query#故障转移
-    rule-set:tld-not-cn,gfw,proxy:
+    rule-set:gfw,proxy:
       - https://cloudflare-dns.com/dns-query#默认代理
       - https://dns.google/dns-query#默认代理
-    rule-set:direct:
+    rule-set:cn-push,direct:
       - https://dns.alidns.com/dns-query#DIRECT
       - https://doh.pub/dns-query#DIRECT
+    rule-set:tld-not-cn:
+      - https://cloudflare-dns.com/dns-query#默认代理
+      - https://dns.google/dns-query#默认代理
     geosite:cn:
       - https://dns.alidns.com/dns-query#DIRECT
       - https://doh.pub/dns-query#DIRECT
